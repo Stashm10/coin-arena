@@ -1,0 +1,22 @@
+"""Every tunable number in Coin Arena. The future fitted model replaces
+scoring.py's use of these; nothing else changes."""
+
+TOP10_SHARE_WARNING = 0.35
+TOP10_SHARE_DISQUALIFIER = 0.55
+SINGLE_HOLDER_WARNING = 0.15
+
+BUNDLE_BUYERS_WARNING = 4
+BUNDLE_BUYERS_DISQUALIFIER = 8
+LAUNCH_WINDOW_S = 60
+
+DEV_LAUNCHES_WARNING = 3
+DEV_LAUNCHES_DISQUALIFIER = 8
+DEV_HISTORY_SAMPLE = 100
+
+CHECK_TIMEOUT_S = 8.0
+
+VERIFY_MIN_AGE_S = 24 * 3600
+DEAD_LIQUIDITY_USD = 1000.0
+RUG_PRICE_RATIO = 0.10
+
+FUNDING_MAX_SIGS = 1000  # creator wallets busier than this: funding check bails
