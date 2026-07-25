@@ -601,20 +601,10 @@ class RpcClient:
             raise FeatureUnavailable("needs Helius key (Settings)")
 
     async def das(self, method: str, params: dict):
+        """DAS methods ride the same Helius JSON-RPC URL; the separate method
+        exists only to enforce that a key is present (public RPC has no DAS)."""
         self._require_key()
-        try:
-            resp = await self._client.post(
-                self._rpc_url,
-                json={"jsonrpc": "2.0", "id": 1, "method": method, "params": params},
-                timeout=10,
-            )
-            resp.raise_for_status()
-            body = resp.json()
-        except Exception as exc:
-            raise RpcError(f"{method}: {redact(str(exc))}") from None
-        if "error" in body:
-            raise RpcError(f"{method}: {redact(str(body['error']))}")
-        return body["result"]
+        return await self.rpc(method, params)
 
     async def enhanced_txs(self, address: str, before: str | None = None,
                            limit: int = 100) -> list[dict]:
