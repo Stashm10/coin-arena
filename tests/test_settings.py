@@ -35,3 +35,12 @@ def test_save_key_roundtrip_and_permissions(tmp_path, monkeypatch):
     mode = stat.S_IMODE(os.stat(tmp_path / "config.json").st_mode)
     assert mode == 0o600
     assert json.loads((tmp_path / "config.json").read_text())["helius_key"] == "abc-123"
+
+
+def test_save_key_tightens_existing_loose_file(tmp_path, monkeypatch):
+    monkeypatch.setenv("ARENA_DATA_DIR", str(tmp_path))
+    p = tmp_path / "config.json"
+    p.write_text("{}")
+    os.chmod(p, 0o644)
+    save_key("abc")
+    assert stat.S_IMODE(os.stat(p).st_mode) == 0o600

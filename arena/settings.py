@@ -34,5 +34,7 @@ def load_settings() -> Settings:
 
 def save_key(key: str) -> None:
     p = _config_path()
-    p.write_text(json.dumps({"helius_key": key}))
-    os.chmod(p, 0o600)
+    fd = os.open(p, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+    with os.fdopen(fd, "w") as f:
+        f.write(json.dumps({"helius_key": key}))
+    os.chmod(p, 0o600)  # tighten a pre-existing looser file too (O_CREAT mode only applies at creation)
