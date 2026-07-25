@@ -49,3 +49,22 @@ async def test_dispersed_supply_passes():
     async with make_client(m) as c:  # 0.2 total, max single 0.02
         f = await holders.run(RpcClient(c, "k"), None, "M", Birth(), None)
     assert f.severity == PASS
+
+
+async def test_no_holder_data_keeps_full_data_contract():
+    m = {"getTokenLargestAccounts": {"value": []},
+         "getTokenSupply": {"value": {"uiAmount": 0}}}
+    async with make_client(m) as c:
+        f = await holders.run(RpcClient(c, "k"), None, "M", Birth(), None)
+    assert f.severity == PASS
+    assert f.data == {"top10_share": 0.0, "max_single": 0.0, "owners": []}
+
+
+async def test_owners_ranked_by_combined_holdings():
+    # W2 holds two smaller accounts summing larger than W1's single account
+    m = rpc_methods([("W1", 300, SYSTEM), ("W2", 200, SYSTEM), ("W2", 200, SYSTEM)],
+                    supply=10000)
+    async with make_client(m) as c:
+        f = await holders.run(RpcClient(c, "k"), None, "M", Birth(), None)
+    assert f.data["owners"] == ["W2", "W1"]
+    assert f.data["max_single"] == 0.04

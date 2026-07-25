@@ -15,7 +15,8 @@ async def run(rpc: RpcClient, store, mint: str, birth: Birth,
     total = (supply["value"] or {}).get("uiAmount") or 0
     entries = [(v["address"], v.get("uiAmount") or 0) for v in largest["value"]]
     if not entries or not total:
-        return Finding("holders", PASS, "No holder data yet", {"owners": []})
+        return Finding("holders", PASS, "No holder data yet",
+                       {"top10_share": 0.0, "max_single": 0.0, "owners": []})
 
     token_accounts = [a for a, _ in entries]
     parsed = await rpc.rpc("getMultipleAccounts",
@@ -36,11 +37,12 @@ async def run(rpc: RpcClient, store, mint: str, birth: Birth,
         o = owners_by_ta.get(ta)
         if o in human:
             amounts[o] = amounts.get(o, 0) + amt
-    shares = sorted((amt / total for amt in amounts.values()), reverse=True)
+    ranked = sorted(amounts.items(), key=lambda kv: kv[1], reverse=True)
+    shares = [amt / total for _, amt in ranked]
     top10 = round(sum(shares[:10]), 4)
     max_single = round(shares[0], 4) if shares else 0.0
     data = {"top10_share": top10, "max_single": max_single,
-            "owners": list(amounts.keys())[:20]}
+            "owners": [o for o, _ in ranked[:20]]}
     pct = f"{top10:.0%}"
     if top10 > TOP10_SHARE_DISQUALIFIER:
         return Finding("holders", DISQUALIFIER,
