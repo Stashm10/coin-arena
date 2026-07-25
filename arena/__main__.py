@@ -5,12 +5,15 @@ import httpx
 from rich.console import Console
 from rich.markup import escape
 from rich.panel import Panel
+from rich.table import Table
 
 from arena.engine import check_mint
 from arena.models import DISQUALIFIER, INFO, WARNING
+from arena.report import flag_hit_rates
 from arena.rpc import RpcClient, RpcError, redact
 from arena.settings import load_settings, save_key
 from arena.store import Store
+from arena.verify import verify_outcomes
 
 console = Console()
 
@@ -59,6 +62,38 @@ async def cmd_set_key(key: str) -> None:
             console.print(f"key saved (validation failed: {redact(str(exc))})")
 
 
+async def cmd_verify() -> None:
+    store = Store()
+    async with httpx.AsyncClient() as client:
+        labeled = await verify_outcomes(client, store)
+    for mint, outcome in labeled:
+        console.print(f"  {mint[:10]}…  {outcome}")
+    console.print(f"{len(labeled)} coin(s) labeled.")
+    store.close()
+
+
+def cmd_report() -> None:
+    store = Store()
+    rows = flag_hit_rates(store)
+    if not rows:
+        console.print("No verified scans yet — run some checks, then "
+                      "'verify' after 24h.")
+        store.close()
+        return
+    table = Table(title="Per-flag hit rates (bad = rugged or dead)")
+    table.add_column("check"); table.add_column("fired → bad")
+    table.add_column("quiet → bad")
+    for r in rows:
+        def cell(bad, total):
+            return f"{bad}/{total} ({bad / total:.0%})" if total else "—"
+        table.add_row(r["check"], cell(r["fired_bad"], r["fired_total"]),
+                      cell(r["quiet_bad"], r["quiet_total"]))
+    console.print(table)
+    console.print("[dim]hit rates need ~300 verified scans to mean much — "
+                  "keep scanning[/dim]")
+    store.close()
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(prog="arena",
                                      description="Coin Arena — pre-buy rug checks")
@@ -67,11 +102,17 @@ def main() -> None:
     p_check.add_argument("mint")
     p_key = sub.add_parser("set-key", help="save your free Helius API key")
     p_key.add_argument("key")
+    sub.add_parser("verify", help="label outcomes of past scans (24h+)")
+    sub.add_parser("report", help="per-flag hit rates from your verified scans")
     args = parser.parse_args()
     if args.command == "check":
         asyncio.run(cmd_check(args.mint))
     elif args.command == "set-key":
         asyncio.run(cmd_set_key(args.key))
+    elif args.command == "verify":
+        asyncio.run(cmd_verify())
+    elif args.command == "report":
+        cmd_report()
 
 
 if __name__ == "__main__":
