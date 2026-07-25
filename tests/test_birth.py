@@ -37,3 +37,9 @@ async def test_rpc_failure_returns_empty_birth():
     async with make_client({"getSignaturesForAddress": 500}) as c:
         b = await fetch_birth(RpcClient(c, "k"), "Mint1")
     assert b.creation_sig is None and b.creator is None and b.first_txs == []
+
+
+async def test_null_result_returns_empty_birth():
+    async with make_client({"getSignaturesForAddress": lambda params: None}) as c:
+        b = await fetch_birth(RpcClient(c, "k"), "Mint1")
+    assert b.creation_sig is None and b.first_txs == []

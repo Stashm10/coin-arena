@@ -25,24 +25,31 @@ async def fetch_birth(rpc: RpcClient, mint: str) -> Birth:
     birth = Birth()
     try:
         page = await rpc.rpc("getSignaturesForAddress", [mint, {"limit": 1000}])
+        if not isinstance(page, list):
+            return birth
         pages = 1
         while len(page) == 1000 and pages < MAX_SIG_PAGES:
             older = await rpc.rpc("getSignaturesForAddress",
                                   [mint, {"limit": 1000, "before": page[-1]["signature"]}])
-            if not older:
+            if not isinstance(older, list) or not older:
                 break
             page = older
             pages += 1
-    except RpcError as exc:
+    except (RpcError, TypeError, KeyError, IndexError) as exc:
         log.warning("birth: signature fetch failed for %s: %s", mint, exc)
         return birth
 
     if not page:
         return birth
-    oldest_first = list(reversed(page))[:KEEP_SIGS]
-    birth.first_sig_infos = oldest_first
-    birth.creation_sig = oldest_first[0]["signature"]
-    birth.created_ts = oldest_first[0].get("blockTime")
+
+    try:
+        oldest_first = list(reversed(page))[:KEEP_SIGS]
+        birth.first_sig_infos = oldest_first
+        birth.creation_sig = oldest_first[0]["signature"]
+        birth.created_ts = oldest_first[0].get("blockTime")
+    except (TypeError, KeyError, IndexError) as exc:
+        log.warning("birth: malformed signatures for %s: %s", mint, exc)
+        return birth
 
     try:
         sigs = [s["signature"] for s in oldest_first[:KEEP_TXS]]
