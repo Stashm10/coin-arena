@@ -1,0 +1,13 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+*.egg-info/
+
+# SDD scratch
+.superpowers/
+
+# Local data (only if ARENA_DATA_DIR points here)
+arena.db
+config.json
