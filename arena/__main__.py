@@ -3,6 +3,7 @@ import asyncio
 
 import httpx
 from rich.console import Console
+from rich.markup import escape
 from rich.panel import Panel
 
 from arena.engine import check_mint
@@ -23,11 +24,11 @@ SEV_STYLE = {DISQUALIFIER: "bold red", WARNING: "yellow", INFO: "dim"}
 
 def print_result(r) -> None:
     label, color = BANNERS[r.verdict]
-    sub = f"{r.symbol or r.mint[:8] + '…'} · scanned in {r.duration_s}s"
+    sub = f"{escape(r.symbol) if r.symbol else r.mint[:8] + '…'} · scanned in {r.duration_s}s"
     console.print(Panel(f"[bold]{label}[/bold]\n{sub}", border_style=color))
     for f in r.findings:
         style = SEV_STYLE.get(f.severity, "")
-        console.print(f"  {f.severity:<13} {f.evidence}", style=style)
+        console.print(f"  {escape(f.severity):<13} {escape(f.evidence)}", style=style)
     if r.unavailable:
         console.print(f"\n[dim]{r.unavailable} of 6 checks unavailable — "
                       "add a free Helius key with: python -m arena set-key <key>[/dim]")
@@ -36,14 +37,16 @@ def print_result(r) -> None:
 async def cmd_check(mint: str) -> None:
     settings = load_settings()
     store = Store()
-    async with httpx.AsyncClient() as client:
-        try:
+    try:
+        async with httpx.AsyncClient() as client:
             result = await check_mint(mint, settings, store, client)
-        except ValueError as exc:
-            console.print(f"[red]{exc}[/red]")
-            return
-    print_result(result)
-    store.close()
+        print_result(result)
+    except ValueError as exc:
+        console.print(f"[red]{exc}[/red]")
+    except Exception as exc:
+        console.print(f"[red]scan failed:[/red] {redact(str(exc))}")
+    finally:
+        store.close()
 
 
 async def cmd_set_key(key: str) -> None:

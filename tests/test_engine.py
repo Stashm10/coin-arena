@@ -1,5 +1,6 @@
 import pytest
 
+from arena.__main__ import print_result  # ensure it doesn't raise on hostile input
 from arena.engine import check_mint
 from arena.settings import Settings
 from arena.store import Store
@@ -63,3 +64,13 @@ async def test_public_mode_still_scans(tmp_path):
         r = await check_mint(GOOD_MINT, Settings(None), store, c)
     assert r.verdict in ("NO_RED_FLAGS", "CAUTION")
     assert r.unavailable >= 2  # bundles, dev_record at minimum
+
+
+def test_print_result_survives_markup_in_symbol_and_evidence(capsys):
+    from arena.models import Finding, ScanResult
+    r = ScanResult(mint="M"*40, verdict="NO_RED_FLAGS",
+                   findings=[Finding("vitals", "INFO", "age [not a tag] 3m", {})],
+                   unavailable=0, price_usd=None, symbol="[red]evil[/red]", duration_s=1.0)
+    print_result(r)  # must not raise MarkupError
+    out = capsys.readouterr().out
+    assert "evil" in out
