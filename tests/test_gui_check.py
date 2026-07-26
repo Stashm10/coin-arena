@@ -46,9 +46,19 @@ def _avoid_result():
     )
 
 
-def _get_controls(view):
-    # controls[2] is the `results` Column per build_check's layout.
-    return view.controls[2]
+# Layout: view.controls[0] = header Row (title, spacer, Settings button);
+# view.controls[1] = centered body Column, whose controls[0] is the input Row
+# (mint_field, check_btn, spinner) and controls[1] is the `results` Column.
+def _input_row(view):
+    return view.controls[1].controls[0]
+
+
+def _results(view):
+    return view.controls[1].controls[1]
+
+
+def _settings_button(view):
+    return view.controls[0].controls[2]
 
 
 def test_invalid_mint_shows_inline_error_without_scanning():
@@ -62,13 +72,13 @@ def test_invalid_mint_shows_inline_error_without_scanning():
     check_mod.run_scan = fake_run_scan
     try:
         view = build_check(page, on_open_settings=lambda: None)
-        do_check = view.controls[1].controls[1].on_click
-        view.controls[1].controls[0].value = "notamint"
+        do_check = _input_row(view).controls[1].on_click
+        _input_row(view).controls[0].value = "notamint"
         do_check(None)
     finally:
         check_mod.run_scan = orig
 
-    results = _get_controls(view)
+    results = _results(view)
     assert called["run_scan"] is False
     assert len(results.controls) == 1
     assert results.controls[0].value == "not a valid Solana mint address"
@@ -88,23 +98,23 @@ def test_valid_mint_renders_verdict_panel_and_finding_rows():
     check_mod.run_scan = fake_run_scan
     try:
         view = build_check(page, on_open_settings=lambda: None)
-        mint_field = view.controls[1].controls[0]
-        do_check = view.controls[1].controls[1].on_click
+        mint_field = _input_row(view).controls[0]
+        do_check = _input_row(view).controls[1].on_click
         mint_field.value = "S" * 44
         do_check(None)
     finally:
         check_mod.run_scan = orig
 
     assert captured["mint"] == "S" * 44
-    results = _get_controls(view)
+    results = _results(view)
     # 1 verdict banner container + 3 finding rows = 4 (no footer, unavailable=0)
     assert len(results.controls) == 4
     banner = results.controls[0]
     assert banner.border.top.color == "#059669"  # NO_RED_FLAGS color
     row_texts = [r.controls[1].value for r in results.controls[1:]]
     assert row_texts == ["mint/freeze revoked", "LP locked", "top10 holds 12%"]
-    check_btn = view.controls[1].controls[1]
-    spinner = view.controls[1].controls[2]
+    check_btn = _input_row(view).controls[1]
+    spinner = _input_row(view).controls[2]
     assert check_btn.disabled is False
     assert spinner.visible is False
 
@@ -120,12 +130,12 @@ def test_avoid_result_renders_disqualifier_and_unavailable_footer():
     check_mod.run_scan = fake_run_scan
     try:
         view = build_check(page, on_open_settings=lambda: None)
-        view.controls[1].controls[0].value = "N" * 44
-        view.controls[1].controls[1].on_click(None)
+        _input_row(view).controls[0].value = "N" * 44
+        _input_row(view).controls[1].on_click(None)
     finally:
         check_mod.run_scan = orig
 
-    results = _get_controls(view)
+    results = _results(view)
     # 1 verdict banner + 1 finding row + 1 unavailable footer = 3
     assert len(results.controls) == 3
     assert results.controls[1].controls[1].value == "bundled mint detected"
@@ -143,19 +153,19 @@ def test_scan_error_renders_redacted_message():
     check_mod.run_scan = fake_run_scan
     try:
         view = build_check(page, on_open_settings=lambda: None)
-        view.controls[1].controls[0].value = "S" * 44
-        view.controls[1].controls[1].on_click(None)
+        _input_row(view).controls[0].value = "S" * 44
+        _input_row(view).controls[1].on_click(None)
     finally:
         check_mod.run_scan = orig
 
-    results = _get_controls(view)
+    results = _results(view)
     assert len(results.controls) == 1
     msg = results.controls[0].value
     assert msg.startswith("scan failed:")
     assert "SECRET123" not in msg
     assert "api-key=***" in msg
-    check_btn = view.controls[1].controls[1]
-    spinner = view.controls[1].controls[2]
+    check_btn = _input_row(view).controls[1]
+    spinner = _input_row(view).controls[2]
     assert check_btn.disabled is False
     assert spinner.visible is False
 
@@ -170,12 +180,12 @@ def test_invalid_value_error_from_scan_shown_verbatim():
     check_mod.run_scan = fake_run_scan
     try:
         view = build_check(page, on_open_settings=lambda: None)
-        view.controls[1].controls[0].value = "S" * 44
-        view.controls[1].controls[1].on_click(None)
+        _input_row(view).controls[0].value = "S" * 44
+        _input_row(view).controls[1].on_click(None)
     finally:
         check_mod.run_scan = orig
 
-    results = _get_controls(view)
+    results = _results(view)
     assert results.controls[0].value == "not a valid Solana mint address"
 
 
@@ -183,14 +193,20 @@ def test_settings_button_routes_via_callback():
     page = FakePage()
     opened = {"flag": False}
     view = build_check(page, on_open_settings=lambda: opened.__setitem__("flag", True))
-    settings_btn = view.controls[0].controls[2]
-    settings_btn.on_click(None)
+    _settings_button(view).on_click(None)
     assert opened["flag"] is True
+
+
+def test_settings_button_has_no_gear_emoji():
+    page = FakePage()
+    view = build_check(page, on_open_settings=lambda: None)
+    assert _settings_button(view).content == "Settings"
+    assert "⚙" not in str(_settings_button(view).content)
 
 
 def test_view_route_and_check_button_style():
     page = FakePage()
     view = build_check(page, on_open_settings=lambda: None)
     assert view.route == "/"
-    check_btn = view.controls[1].controls[1]
+    check_btn = _input_row(view).controls[1]
     assert check_btn.disabled is None or check_btn.disabled is False

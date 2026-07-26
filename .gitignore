@@ -13,3 +13,7 @@ arena.db
 config.json
 dist/
 build/
+
+# macOS + packaging junk
+.DS_Store
+*.spec

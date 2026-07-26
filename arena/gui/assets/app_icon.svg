@@ -1,0 +1,13 @@
+<svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Coin Arena app icon">
+  <rect x="72" y="72" width="880" height="880" rx="200" ry="200" fill="#FFFFFF" stroke="#0891B2" stroke-width="20"/>
+  <g transform="translate(247 247) scale(5.3)">
+    <path d="M34 87 L36 84 L33 76 L37 66 L44 58 L42 52 L31 56 L25 48 L32 35 L42 26 L46 15 L51 24 L62 17 L59 30 L65 46 L66 62 L61 76 L64 84 L66 87 Z"
+          fill="none" stroke="#0891B2" stroke-width="4" stroke-linejoin="round" stroke-linecap="round"/>
+    <circle cx="46" cy="34" r="2.8" fill="#0891B2"/>
+    <path d="M45 43 L52 45 L56 52" fill="none" stroke="#06B6D4" stroke-width="2.4" stroke-linecap="round"/>
+    <circle cx="62" cy="17" r="3.2" fill="#FFFFFF" stroke="#0891B2" stroke-width="2"/>
+    <circle cx="46" cy="15" r="3.2" fill="#FFFFFF" stroke="#0891B2" stroke-width="2"/>
+    <circle cx="25" cy="48" r="3.2" fill="#FFFFFF" stroke="#0891B2" stroke-width="2"/>
+    <circle cx="66" cy="62" r="3.2" fill="#FFFFFF" stroke="#0891B2" stroke-width="2"/>
+  </g>
+</svg>

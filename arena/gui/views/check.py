@@ -13,7 +13,7 @@ def build_check(page: ft.Page, on_open_settings) -> ft.View:
                               text_style=ft.TextStyle(font_family="monospace"))
     check_btn = ft.FilledButton("Check", bgcolor=theme.CYAN, color=theme.WHITE)
     spinner = ft.ProgressRing(visible=False, width=18, height=18, color=theme.CYAN)
-    results = ft.Column(spacing=theme.GAP)
+    results = ft.Column(spacing=theme.GAP, width=520)
 
     def render(result):
         results.controls.clear()
@@ -68,16 +68,27 @@ def build_check(page: ft.Page, on_open_settings) -> ft.View:
 
     check_btn.on_click = do_check
 
+    header = ft.Row([
+        ft.Text("Coin Arena", size=20, weight=ft.FontWeight.W_500, color=theme.INK),
+        ft.Container(expand=True),
+        ft.TextButton("Settings", on_click=lambda _: on_open_settings()),
+    ])
+
+    body = ft.Column(
+        [
+            ft.Row([mint_field, check_btn, spinner],
+                   alignment=ft.MainAxisAlignment.CENTER),
+            results,
+        ],
+        expand=True,
+        alignment=ft.MainAxisAlignment.CENTER,
+        horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+        spacing=theme.PAD,
+    )
+
     return ft.View(
         route="/",
         bgcolor=theme.WHITE,
         padding=theme.PAD,
-        controls=[
-            ft.Row([ft.Text("Coin Arena", size=20, weight=ft.FontWeight.W_500,
-                            color=theme.INK),
-                    ft.Container(expand=True),
-                    ft.TextButton("⚙ Settings", on_click=lambda _: on_open_settings())]),
-            ft.Row([mint_field, check_btn, spinner]),
-            results,
-        ],
+        controls=[header, body],
     )
