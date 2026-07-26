@@ -11,4 +11,4 @@ def logo_image(width: int = 96):
     """Flet Image control for the logo. Imported lazily so tests and the
     engine never pull in flet."""
     import flet as ft
-    return ft.Image(src=logo_path(), width=width, height=width)
+    return ft.Image(src="circuit_knight.svg", width=width, height=width)
