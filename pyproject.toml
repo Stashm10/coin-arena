@@ -6,13 +6,17 @@ dependencies = ["httpx", "rich"]
 
 [project.optional-dependencies]
 dev = ["pytest", "pytest-asyncio"]
+gui = ["flet>=0.24"]
 
 [build-system]
 requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-packages = ["arena", "arena.checks"]
+packages = ["arena", "arena.checks", "arena.gui", "arena.gui.views"]
+
+[tool.setuptools.package-data]
+"arena.gui" = ["assets/*.svg"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
