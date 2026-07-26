@@ -36,6 +36,11 @@ CREATE TABLE IF NOT EXISTS scan_wallets (
     role TEXT NOT NULL,
     UNIQUE(mint, address, role)
 );
+CREATE TABLE IF NOT EXISTS manual_labels (
+    mint TEXT PRIMARY KEY,
+    was_rug INTEGER NOT NULL,
+    ts INTEGER NOT NULL
+);
 """
 
 
@@ -117,6 +122,49 @@ class Store:
             "SELECT s.ts, s.mint, s.symbol, s.verdict, o.outcome FROM scans s "
             "LEFT JOIN coin_outcomes o ON o.mint = s.mint "
             "ORDER BY s.id DESC LIMIT ?", (limit,)).fetchall()
+        return [dict(r) for r in rows]
+
+    def set_manual_label(self, mint: str, was_rug: int | None) -> None:
+        if was_rug is None:
+            self.conn.execute("DELETE FROM manual_labels WHERE mint = ?", (mint,))
+        else:
+            self.conn.execute(
+                "INSERT INTO manual_labels (mint, was_rug, ts) VALUES (?, ?, ?) "
+                "ON CONFLICT(mint) DO UPDATE SET was_rug = excluded.was_rug, "
+                "ts = excluded.ts",
+                (mint, int(was_rug), int(time.time())))
+        self.conn.commit()
+
+    def manual_label(self, mint: str) -> int | None:
+        row = self.conn.execute(
+            "SELECT was_rug FROM manual_labels WHERE mint = ?", (mint,)).fetchone()
+        return row["was_rug"] if row else None
+
+    def labeled_training_rows(self) -> list[dict]:
+        rows = self.conn.execute(
+            "SELECT s.scan_json AS scan_json, m.was_rug AS was_rug "
+            "FROM manual_labels m JOIN scans s ON s.id = "
+            "(SELECT id FROM scans WHERE mint = m.mint ORDER BY id DESC LIMIT 1)"
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    def label_counts(self) -> dict:
+        total = self.conn.execute(
+            "SELECT COUNT(DISTINCT mint) AS n FROM scans").fetchone()["n"]
+        labeled = self.conn.execute(
+            "SELECT COUNT(*) AS n FROM manual_labels").fetchone()["n"]
+        rugs = self.conn.execute(
+            "SELECT COUNT(*) AS n FROM manual_labels WHERE was_rug = 1").fetchone()["n"]
+        return {"total_scans": total, "labeled": labeled, "rugs": rugs,
+                "cleans": labeled - rugs, "unlabeled": total - labeled}
+
+    def scans_for_history(self, limit: int = 200) -> list[dict]:
+        rows = self.conn.execute(
+            "SELECT s.mint, s.symbol, s.ts, s.verdict, m.was_rug FROM scans s "
+            "JOIN (SELECT mint, MAX(id) AS mid FROM scans GROUP BY mint) latest "
+            "ON latest.mid = s.id "
+            "LEFT JOIN manual_labels m ON m.mint = s.mint "
+            "ORDER BY s.ts DESC LIMIT ?", (limit,)).fetchall()
         return [dict(r) for r in rows]
 
     def close(self) -> None:
