@@ -11,3 +11,5 @@ __pycache__/
 # Local data (only if ARENA_DATA_DIR points here)
 arena.db
 config.json
+dist/
+build/

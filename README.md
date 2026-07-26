@@ -32,3 +32,30 @@ No key? Scans still run in degraded public mode (3 of 6 checks).
 
     .venv/bin/pytest             # offline, no network
     .venv/bin/pytest -m live -v  # real APIs, needs key
+
+## Desktop app (Coin Arena GUI)
+
+A windowed version of the checker — no terminal needed once it's running.
+
+### Run it (development)
+
+    python3 -m venv .venv && .venv/bin/pip install -e '.[gui,dev]'
+    .venv/bin/python -m arena.gui
+
+Paste a Solana mint, click Check. Add your free Helius key under ⚙ Settings
+(or run in public mode with 3 of 6 checks). Get a key at https://helius.dev.
+
+### Build a double-clickable Mac app
+
+    .venv/bin/flet pack arena/gui/__main__.py --name "Coin Arena" \
+        --add-data "arena/gui/assets:arena/gui/assets"
+
+This produces `dist/Coin Arena.app`. It is unsigned, so on first launch
+macOS will warn — right-click the app → Open → Open to allow it once.
+No API key is bundled; each user adds their own under Settings.
+
+### Honest caveats
+
+- 🟢 "NO RED FLAGS" means no *mechanical* rug setup was found — never "safe".
+  It cannot detect intent, social/exit scams, or a slow bleed.
+- Not financial advice. The app never trades; execution stays manual.
