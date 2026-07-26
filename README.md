@@ -36,6 +36,18 @@ Meme coins are extremely high risk. Only ever risk what you can afford to lose e
 For developers
 Coin Arena is a small Python app: a pure analysis engine (arena/) with a Flet desktop GUI (arena/gui/) and a terminal CLI on top. The engine never imports the GUI, so it's fully testable offline.
 
+## Installing on Mac
+
+> **Works on Apple Silicon Macs (M1/M2/M3/M4).** Intel Macs aren't supported yet.
+
+1. On the [Releases](https://github.com/Stashm10/coin-arena/releases) page, download **`Coin.Arena.zip`** (ignore the "Source code" files).
+2. Double-click the zip to unzip, then drag **Coin Arena** into your **Applications** folder.
+3. Double-click the app. macOS will say *""Coin Arena" Not Opened"* — **click `Done`. Do NOT click "Move to Trash."** (The app is safe; macOS just can't verify unsigned apps.)
+4. Open **System Settings → Privacy & Security**, scroll down to **Security**, and click **`Open Anyway`** next to the Coin Arena message. Authenticate with your password or Touch ID.
+5. Done — it opens now, and every time after this with a normal double-click.
+
+**Prefer the terminal?** One command skips all of the above:
+
 Run from source
 python3 -m venv .venv
 .venv/bin/pip install -e '.[gui,dev]'
