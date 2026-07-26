@@ -1,9 +1,9 @@
 Coin Arena 
-Pre-buy rug checks for Solana meme coins. Paste a token's mint address and get a verdict in seconds — before you buy, not after.
+Pre-buy rug checks for Solana meme coins. Paste a token's mint address and get a verdict in seconds before you buy, not after.
 
-AVOID — a mechanical rug setup was found
-CAUTION — a couple of warning signs
-NO RED FLAGS — nothing obvious found (not the same as "safe" — read the caveats)
+AVOID: a mechanical rug setup was found
+CAUTION: a couple of warning signs
+NO RED FLAGS: nothing obvious found (not the same as "safe" — read the caveats)
 It checks six things a candlestick chart can't show you: whether the dev can still mint or freeze the token, how concentrated the supply is, whether the launch was bundled by one person across many wallets, the dev wallet's launch history, who funded the dev, and basic vitals (age, holders, liquidity).
 
 Download (Mac)
