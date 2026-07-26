@@ -65,7 +65,7 @@ def test_routing_splash_to_check_to_settings_and_back(monkeypatch, tmp_path):
 
     # Click "Settings" on the Check view.
     check_view = page.views[0]
-    settings_btn = check_view.controls[0].controls[2]
+    settings_btn = check_view.controls[0].controls[3]
     settings_btn.on_click(None)
     assert len(page.views) == 2
     assert page.views[-1].route == "/settings"

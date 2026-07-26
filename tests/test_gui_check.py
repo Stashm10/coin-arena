@@ -46,7 +46,7 @@ def _avoid_result():
     )
 
 
-# Layout: view.controls[0] = header Row (title, spacer, Settings button);
+# Layout: view.controls[0] = header Row (title, spacer, History, Settings button);
 # view.controls[1] = centered body Column, whose controls[0] is the input Row
 # (mint_field, check_btn, spinner) and controls[1] is the `results` Column.
 def _input_row(view):
@@ -58,6 +58,10 @@ def _results(view):
 
 
 def _settings_button(view):
+    return view.controls[0].controls[3]
+
+
+def _history_button(view):
     return view.controls[0].controls[2]
 
 
@@ -71,7 +75,8 @@ def test_invalid_mint_shows_inline_error_without_scanning():
     orig = check_mod.run_scan
     check_mod.run_scan = fake_run_scan
     try:
-        view = build_check(page, on_open_settings=lambda: None)
+        view = build_check(page, on_open_settings=lambda: None,
+                           on_open_history=lambda: None)
         do_check = _input_row(view).controls[1].on_click
         _input_row(view).controls[0].value = "notamint"
         do_check(None)
@@ -97,7 +102,8 @@ def test_valid_mint_renders_verdict_panel_and_finding_rows():
     orig = check_mod.run_scan
     check_mod.run_scan = fake_run_scan
     try:
-        view = build_check(page, on_open_settings=lambda: None)
+        view = build_check(page, on_open_settings=lambda: None,
+                           on_open_history=lambda: None)
         mint_field = _input_row(view).controls[0]
         do_check = _input_row(view).controls[1].on_click
         mint_field.value = "S" * 44
@@ -129,7 +135,8 @@ def test_avoid_result_renders_disqualifier_and_unavailable_footer():
     orig = check_mod.run_scan
     check_mod.run_scan = fake_run_scan
     try:
-        view = build_check(page, on_open_settings=lambda: None)
+        view = build_check(page, on_open_settings=lambda: None,
+                           on_open_history=lambda: None)
         _input_row(view).controls[0].value = "N" * 44
         _input_row(view).controls[1].on_click(None)
     finally:
@@ -152,7 +159,8 @@ def test_scan_error_renders_redacted_message():
     orig = check_mod.run_scan
     check_mod.run_scan = fake_run_scan
     try:
-        view = build_check(page, on_open_settings=lambda: None)
+        view = build_check(page, on_open_settings=lambda: None,
+                           on_open_history=lambda: None)
         _input_row(view).controls[0].value = "S" * 44
         _input_row(view).controls[1].on_click(None)
     finally:
@@ -179,7 +187,8 @@ def test_invalid_value_error_from_scan_shown_verbatim():
     orig = check_mod.run_scan
     check_mod.run_scan = fake_run_scan
     try:
-        view = build_check(page, on_open_settings=lambda: None)
+        view = build_check(page, on_open_settings=lambda: None,
+                           on_open_history=lambda: None)
         _input_row(view).controls[0].value = "S" * 44
         _input_row(view).controls[1].on_click(None)
     finally:
@@ -192,21 +201,33 @@ def test_invalid_value_error_from_scan_shown_verbatim():
 def test_settings_button_routes_via_callback():
     page = FakePage()
     opened = {"flag": False}
-    view = build_check(page, on_open_settings=lambda: opened.__setitem__("flag", True))
+    view = build_check(page, on_open_settings=lambda: opened.__setitem__("flag", True),
+                       on_open_history=lambda: None)
     _settings_button(view).on_click(None)
     assert opened["flag"] is True
 
 
 def test_settings_button_has_no_gear_emoji():
     page = FakePage()
-    view = build_check(page, on_open_settings=lambda: None)
+    view = build_check(page, on_open_settings=lambda: None,
+                       on_open_history=lambda: None)
     assert _settings_button(view).content == "Settings"
     assert "⚙" not in str(_settings_button(view).content)
 
 
 def test_view_route_and_check_button_style():
     page = FakePage()
-    view = build_check(page, on_open_settings=lambda: None)
+    view = build_check(page, on_open_settings=lambda: None,
+                       on_open_history=lambda: None)
     assert view.route == "/"
     check_btn = _input_row(view).controls[1]
     assert check_btn.disabled is None or check_btn.disabled is False
+
+
+def test_history_button_routes_via_callback():
+    page = FakePage()
+    opened = {"flag": False}
+    view = build_check(page, on_open_settings=lambda: None,
+                       on_open_history=lambda: opened.__setitem__("flag", True))
+    _history_button(view).on_click(None)
+    assert opened["flag"] is True

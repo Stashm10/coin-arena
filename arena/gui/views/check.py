@@ -4,11 +4,12 @@ from arena.engine import MINT_RE
 from arena.gui import theme
 from arena.gui.scan_worker import run_scan
 from arena.gui.viewmodel import row_views, unavailable_footer, verdict_view
+from arena.model import model_info
 from arena.rpc import redact
 from arena.settings import load_settings
 
 
-def build_check(page: ft.Page, on_open_settings) -> ft.View:
+def build_check(page: ft.Page, on_open_settings, on_open_history) -> ft.View:
     mint_field = ft.TextField(label="Solana mint address", width=440,
                               text_style=ft.TextStyle(font_family="monospace"))
     check_btn = ft.FilledButton("Check", bgcolor=theme.CYAN, color=theme.WHITE)
@@ -25,6 +26,16 @@ def build_check(page: ft.Page, on_open_settings) -> ft.View:
         results.controls.append(ft.Container(
             bgcolor=theme.WHITE, border=ft.Border.all(1, v.color),
             border_radius=8, padding=theme.PAD, content=ft.Column(banner, spacing=2)))
+        if result.rug_probability is not None:
+            pct = round(result.rug_probability * 100, 1)
+            n = (model_info() or {}).get("n_samples", 0)
+            p = result.rug_probability
+            mcolor = (theme.VERDICT_COLORS["AVOID"] if p >= 0.70
+                      else theme.VERDICT_COLORS["CAUTION"] if p >= 0.35
+                      else theme.VERDICT_COLORS["NO_RED_FLAGS"])
+            results.controls.append(ft.Text(
+                f"Model estimate: {pct}% rug risk (from {n} labeled coins)",
+                color=mcolor, weight=ft.FontWeight.W_500))
         for r in row_views(result):
             results.controls.append(ft.Row([
                 ft.Text(r.severity, width=120, color=r.color,
@@ -71,6 +82,7 @@ def build_check(page: ft.Page, on_open_settings) -> ft.View:
     header = ft.Row([
         ft.Text("Coin Arena", size=20, weight=ft.FontWeight.W_500, color=theme.INK),
         ft.Container(expand=True),
+        ft.TextButton("History", on_click=lambda _: on_open_history()),
         ft.TextButton("Settings", on_click=lambda _: on_open_settings()),
     ])
 
