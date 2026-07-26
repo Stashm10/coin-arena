@@ -39,6 +39,29 @@ history, who funded the dev, and basic vitals (age, holders, liquidity).
 
 Your key is stored only on your own machine and is never bundled or shared.
 
+## Learning mode — teach it from your own results (optional)
+
+Coin Arena can go beyond fixed rules and learn a **rug-probability** from your
+own track record:
+
+1. **Label outcomes.** Click **History** in the top bar to see your past scans.
+   For each coin you know the fate of, tap **Rug**, **Clean**, or **Unsure**.
+2. **Train the model** (from the source folder, occasionally — needs the `ml`
+   extra):
+   ```bash
+   .venv/bin/pip install -e '.[ml]'
+   .venv/bin/python -m arena.train
+   ```
+   It learns which warning signs actually predicted rugs *in your data* and
+   prints the weights. It refuses to train on fewer than 20 labeled coins or a
+   single class, so it never produces a garbage model.
+3. **Scan.** After training, each scan shows a **"Model estimate: N% rug risk"**
+   line alongside the rules verdict. The rules stay as the always-on baseline;
+   the model is additive, and the sample count is always shown so you know how
+   much to trust it.
+
+Nothing runs in the background — labeling and training are both on-demand.
+
 ## The six checks
 
 | Check | What it catches |
