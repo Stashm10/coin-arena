@@ -7,8 +7,6 @@ concentration, launch bundling, dev history, funding trail, vitals.
 Every scan is logged locally; `verify` labels what actually happened;
 `report` shows which flags actually predicted rugs in YOUR data.
 
-The desktop app (GUI) is coming; this is the engine + terminal preview.
-
 ## Setup
 
     python3 -m venv .venv && .venv/bin/pip install -e '.[dev]'
@@ -21,12 +19,6 @@ No key? Scans still run in degraded public mode (3 of 6 checks).
     .venv/bin/python -m arena check <mint address>
     .venv/bin/python -m arena verify     # label past scans (24h+ old)
     .venv/bin/python -m arena report     # per-flag hit rates
-
-## Honest caveats
-
-- This detects *mechanical* rug setups. It cannot detect intent, Twitter
-  exit scams, or slow deaths. 🟢 means "no red flags found", never "safe".
-- Not financial advice. The tool never trades.
 
 ## Tests
 
@@ -54,8 +46,10 @@ This produces `dist/Coin Arena.app`. It is unsigned, so on first launch
 macOS will warn — right-click the app → Open → Open to allow it once.
 No API key is bundled; each user adds their own under Settings.
 
-### Honest caveats
+## Honest caveats
 
-- 🟢 "NO RED FLAGS" means no *mechanical* rug setup was found — never "safe".
-  It cannot detect intent, social/exit scams, or a slow bleed.
-- Not financial advice. The app never trades; execution stays manual.
+- Both the CLI and the desktop app detect *mechanical* rug setups only.
+  Neither can detect intent, social/Twitter exit scams, or a slow bleed.
+  🟢 "NO RED FLAGS" means no *mechanical* rug setup was found — never "safe".
+- Not financial advice. Neither the CLI nor the app trades; execution
+  stays manual.

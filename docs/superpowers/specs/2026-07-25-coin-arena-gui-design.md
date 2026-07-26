@@ -115,8 +115,10 @@ it is also the window icon where Flet supports it.
   normally. Any truly unexpected exception in the worker → `on_error`
   shows a dismissible redacted message; the window never crashes.
 - Missing/invalid key → app runs in public mode; Settings makes fixing it
-  obvious. Saving an invalid key still saves it; a "validate" ping
-  (one `getSlot`) shows "saved, but validation failed" without blocking.
+  obvious. Saving an invalid key still saves it. The "validate" ping
+  (one `getSlot`) that would show "saved, but validation failed" is
+  deferred to fast-follow (see Out of scope below); today Settings just
+  shows Full/Public mode after save.
 
 ## Packaging
 
@@ -143,3 +145,6 @@ it is also the window icon where Flet supports it.
 - Smart-money display polish beyond the existing vitals line.
 - Windows/Linux builds.
 - Code signing / notarization.
+- Settings key-validation ping (spec's "saved, but validation failed"
+  feedback) — deferred; the CLI `set-key` validates, and Settings shows
+  Full/Public mode.
