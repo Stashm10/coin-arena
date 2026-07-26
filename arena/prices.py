@@ -31,10 +31,10 @@ async def fetch_pair(client: httpx.AsyncClient, mint: str) -> PairInfo | None:
         resp = await client.get(DEXSCREENER_URL.format(mint=mint), timeout=10)
         resp.raise_for_status()
         data = resp.json()
+        pairs = data.get("pairs") or []
     except Exception as exc:
         raise PairLookupError(str(exc)) from None
 
-    pairs = data.get("pairs") or []
     if not pairs:
         return None
 

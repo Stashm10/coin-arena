@@ -1,3 +1,4 @@
+import httpx
 import pytest
 
 from arena.prices import PairLookupError, fetch_pair
@@ -32,3 +33,15 @@ async def test_transport_failure_raises_pair_lookup_error():
     async with make_client(dexscreener={"MintD": 500}) as c:
         with pytest.raises(PairLookupError):
             await fetch_pair(c, "MintD")
+
+
+async def test_non_dict_body_raises_pairlookuperror():
+    # Valid JSON, but not a dict (e.g. DexScreener returns a bare array) —
+    # .get("pairs") on it must not leak a raw AttributeError past callers'
+    # `except PairLookupError`.
+    def handler(request):
+        return httpx.Response(200, json=[])
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as c:
+        with pytest.raises(PairLookupError):
+            await fetch_pair(c, "MintA")

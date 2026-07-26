@@ -79,6 +79,18 @@ async def test_scan_survives_save_scan_failure(tmp_path):
     assert len(r.findings) == 6
 
 
+async def test_scan_survives_non_dict_dexscreener_body(tmp_path):
+    # DexScreener returning valid JSON that isn't a dict (e.g. a bare array)
+    # must not escape as a raw AttributeError — check_mint stays never-raise
+    # and just treats the pair as unavailable.
+    store = Store(tmp_path / "a.db")
+    async with make_client(CLEAN_RPC, enhanced=ENHANCED,
+                           dexscreener={GOOD_MINT: []}) as c:
+        r = await check_mint(GOOD_MINT, Settings("k"), store, c)
+    assert r.price_usd is None and r.symbol is None
+    assert len(r.findings) == 6
+
+
 def test_print_result_survives_markup_in_symbol_and_evidence(capsys):
     from arena.models import Finding, ScanResult
     r = ScanResult(mint="M"*40, verdict="NO_RED_FLAGS",
