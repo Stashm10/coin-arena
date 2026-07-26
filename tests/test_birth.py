@@ -43,3 +43,20 @@ async def test_null_result_returns_empty_birth():
     async with make_client({"getSignaturesForAddress": lambda params: None}) as c:
         b = await fetch_birth(RpcClient(c, "k"), "Mint1")
     assert b.creation_sig is None and b.first_txs == []
+
+
+async def test_full_page_every_time_marks_truncated():
+    # A coin with more history than MAX_SIG_PAGES * 1000 signatures never
+    # reaches true creation — the result must be flagged truncated so
+    # downstream checks don't treat the slice as the full launch window.
+    full_page = lambda params: [  # noqa: E731
+        {"signature": f"s{i}", "slot": i, "blockTime": i} for i in range(1000)]
+    async with make_client({"getSignaturesForAddress": full_page}) as c:
+        b = await fetch_birth(RpcClient(c, "k"), "Mint1")
+    assert b.truncated is True
+
+
+async def test_short_history_is_not_truncated():
+    async with make_client({"getSignaturesForAddress": SIGS}, enhanced=BY_SIG) as c:
+        b = await fetch_birth(RpcClient(c, "k"), "Mint1")
+    assert b.truncated is False

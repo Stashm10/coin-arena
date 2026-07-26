@@ -53,3 +53,13 @@ async def test_full_mode_no_history_is_info():
     async with make_client() as c:
         f = await bundles.run(RpcClient(c, "k"), None, MINT, birth_with([]), None)
     assert f.severity == INFO
+
+
+async def test_truncated_history_is_info_too_established():
+    truncated_birth = Birth(creation_sig="s0", creator="Dev", created_ts=100,
+                            first_sig_infos=[], first_txs=[], truncated=True)
+    async with make_client() as c:
+        f = await bundles.run(RpcClient(c, "k"), None, MINT, truncated_birth, None)
+    assert f.severity == INFO
+    assert "too established" in f.evidence
+    assert f.data["truncated"] is True

@@ -23,11 +23,14 @@ async def run(rpc: RpcClient, store, mint: str, birth: Birth,
         pass  # vitals degrades, never fails
     liq = pair.liquidity_usd if pair else None
     bits = []
+    data = {"age_s": age_s, "holder_count": holder_count, "liquidity_usd": liq}
     if age_s is not None:
-        bits.append(f"age {_fmt_age(age_s)}")
+        if birth.truncated:
+            bits.append(f"age ≥ {_fmt_age(age_s)} (history truncated)")
+            data["age_truncated"] = True
+        else:
+            bits.append(f"age {_fmt_age(age_s)}")
     if holder_count is not None:
         bits.append(f"{'1000+' if holder_count >= 1000 else holder_count} holders")
     bits.append(f"liquidity ${liq:,.0f}" if liq is not None else "no DEX pair yet")
-    return Finding("vitals", INFO, " · ".join(bits),
-                   {"age_s": age_s, "holder_count": holder_count,
-                    "liquidity_usd": liq})
+    return Finding("vitals", INFO, " · ".join(bits), data)

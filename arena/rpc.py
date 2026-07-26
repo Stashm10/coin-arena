@@ -39,9 +39,12 @@ class RpcClient:
             body = resp.json()
         except Exception as exc:
             raise RpcError(f"{method}: {redact(str(exc))}") from None
-        if "error" in body:
-            raise RpcError(f"{method}: {redact(str(body['error']))}")
-        return body["result"]
+        try:
+            if "error" in body:
+                raise RpcError(f"{method}: {redact(str(body['error']))}")
+            return body["result"]
+        except (KeyError, TypeError):
+            raise RpcError(f"{method}: malformed response") from None
 
     def _require_key(self):
         if not self._key:

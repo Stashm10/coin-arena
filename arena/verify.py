@@ -2,7 +2,7 @@ import time
 
 import httpx
 
-from arena.prices import fetch_pair
+from arena.prices import PairLookupError, fetch_pair
 from arena.store import Store
 from arena.thresholds import DEAD_LIQUIDITY_USD, RUG_PRICE_RATIO, VERIFY_MIN_AGE_S
 
@@ -12,7 +12,10 @@ async def verify_outcomes(client: httpx.AsyncClient, store: Store,
     now = now or int(time.time())
     labeled: list[tuple[str, str]] = []
     for row in store.unverified_scans(now - VERIFY_MIN_AGE_S):
-        pair = await fetch_pair(client, row["mint"])
+        try:
+            pair = await fetch_pair(client, row["mint"])
+        except PairLookupError:
+            continue  # could not find out — leave unverified, don't guess
         if pair is None or (pair.liquidity_usd or 0) < DEAD_LIQUIDITY_USD:
             outcome = "DEAD"
         elif (row["price_usd_at_scan"] and pair.price_usd is not None

@@ -66,6 +66,19 @@ async def test_public_mode_still_scans(tmp_path):
     assert r.unavailable >= 2  # bundles, dev_record at minimum
 
 
+async def test_scan_survives_save_scan_failure(tmp_path):
+    store = Store(tmp_path / "a.db")
+
+    def boom(*args, **kwargs):
+        raise RuntimeError("disk full")
+
+    store.save_scan = boom
+    async with make_client(CLEAN_RPC, enhanced=ENHANCED, dexscreener=DS) as c:
+        r = await check_mint(GOOD_MINT, Settings("k"), store, c)
+    assert r.verdict == "NO_RED_FLAGS"
+    assert len(r.findings) == 6
+
+
 def test_print_result_survives_markup_in_symbol_and_evidence(capsys):
     from arena.models import Finding, ScanResult
     r = ScanResult(mint="M"*40, verdict="NO_RED_FLAGS",

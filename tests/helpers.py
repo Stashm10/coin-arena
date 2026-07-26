@@ -28,6 +28,8 @@ def make_client(rpc_methods=None, enhanced=None, dexscreener=None):
         if "api.dexscreener.com" in url:
             mint = request.url.path.split("/")[-1]
             body = dexscreener.get(mint)
+            if isinstance(body, int):
+                return httpx.Response(body)
             return httpx.Response(200, json=body if body is not None else {"pairs": None})
         if request.method == "POST":  # JSON-RPC
             body = json.loads(request.content)

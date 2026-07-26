@@ -53,45 +53,55 @@ async def cmd_check(mint: str) -> None:
 
 
 async def cmd_set_key(key: str) -> None:
-    save_key(key)
-    async with httpx.AsyncClient() as client:
-        try:
-            await RpcClient(client, key).rpc("getSlot", [])
-            console.print("key saved (validated)")
-        except RpcError as exc:
-            console.print(f"key saved (validation failed: {redact(str(exc))})")
+    try:
+        save_key(key)
+        async with httpx.AsyncClient() as client:
+            try:
+                await RpcClient(client, key).rpc("getSlot", [])
+                console.print("key saved (validated)")
+            except RpcError as exc:
+                console.print(f"key saved (validation failed: {redact(str(exc))})")
+    except Exception as exc:
+        console.print(f"[red]set-key failed:[/red] {redact(str(exc))}")
 
 
 async def cmd_verify() -> None:
     store = Store()
-    async with httpx.AsyncClient() as client:
-        labeled = await verify_outcomes(client, store)
-    for mint, outcome in labeled:
-        console.print(f"  {mint[:10]}…  {outcome}")
-    console.print(f"{len(labeled)} coin(s) labeled.")
-    store.close()
+    try:
+        async with httpx.AsyncClient() as client:
+            labeled = await verify_outcomes(client, store)
+        for mint, outcome in labeled:
+            console.print(f"  {mint[:10]}…  {outcome}")
+        console.print(f"{len(labeled)} coin(s) labeled.")
+    except Exception as exc:
+        console.print(f"[red]verify failed:[/red] {redact(str(exc))}")
+    finally:
+        store.close()
 
 
 def cmd_report() -> None:
     store = Store()
-    rows = flag_hit_rates(store)
-    if not rows:
-        console.print("No verified scans yet — run some checks, then "
-                      "'verify' after 24h.")
+    try:
+        rows = flag_hit_rates(store)
+        if not rows:
+            console.print("No verified scans yet — run some checks, then "
+                          "'verify' after 24h.")
+            return
+        table = Table(title="Per-flag hit rates (bad = rugged or dead)")
+        table.add_column("check"); table.add_column("fired → bad")
+        table.add_column("quiet → bad")
+        for r in rows:
+            def cell(bad, total):
+                return f"{bad}/{total} ({bad / total:.0%})" if total else "—"
+            table.add_row(r["check"], cell(r["fired_bad"], r["fired_total"]),
+                          cell(r["quiet_bad"], r["quiet_total"]))
+        console.print(table)
+        console.print("[dim]hit rates need ~300 verified scans to mean much — "
+                      "keep scanning[/dim]")
+    except Exception as exc:
+        console.print(f"[red]report failed:[/red] {redact(str(exc))}")
+    finally:
         store.close()
-        return
-    table = Table(title="Per-flag hit rates (bad = rugged or dead)")
-    table.add_column("check"); table.add_column("fired → bad")
-    table.add_column("quiet → bad")
-    for r in rows:
-        def cell(bad, total):
-            return f"{bad}/{total} ({bad / total:.0%})" if total else "—"
-        table.add_row(r["check"], cell(r["fired_bad"], r["fired_total"]),
-                      cell(r["quiet_bad"], r["quiet_total"]))
-    console.print(table)
-    console.print("[dim]hit rates need ~300 verified scans to mean much — "
-                  "keep scanning[/dim]")
-    store.close()
 
 
 def main() -> None:

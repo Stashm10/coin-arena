@@ -39,3 +39,15 @@ async def test_fresh_scans_not_verified_yet(tmp_path):
                     None, None, [])
     async with make_client() as c:
         assert await verify_outcomes(c, store) == []
+
+
+async def test_dexscreener_outage_leaves_coin_unverified(tmp_path):
+    # A DexScreener transport failure must never be mislabeled DEAD — it
+    # should be skipped, leaving the scan pending for a later verify run.
+    store = Store(tmp_path / "a.db")
+    seed(store, "MintDown", 1.0)
+    ds = {"MintDown": 500}
+    async with make_client(dexscreener=ds) as c:
+        labeled = await verify_outcomes(c, store)
+    assert labeled == []
+    assert len(store.unverified_scans(2**62)) == 1

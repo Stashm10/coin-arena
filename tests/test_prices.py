@@ -1,4 +1,6 @@
-from arena.prices import fetch_pair
+import pytest
+
+from arena.prices import PairLookupError, fetch_pair
 from tests.helpers import make_client
 
 DS = {"MintA": {"pairs": [
@@ -18,6 +20,15 @@ async def test_no_pairs_returns_none():
         assert await fetch_pair(c, "MintB") is None
 
 
-async def test_malformed_returns_none():
+async def test_malformed_pair_raises_pair_lookup_error():
+    # A malformed entry in an otherwise-successful response means we
+    # couldn't parse it, not that we confirmed there are no pairs.
     async with make_client(dexscreener={"MintC": {"pairs": [None]}}) as c:
-        assert await fetch_pair(c, "MintC") is None
+        with pytest.raises(PairLookupError):
+            await fetch_pair(c, "MintC")
+
+
+async def test_transport_failure_raises_pair_lookup_error():
+    async with make_client(dexscreener={"MintD": 500}) as c:
+        with pytest.raises(PairLookupError):
+            await fetch_pair(c, "MintD")

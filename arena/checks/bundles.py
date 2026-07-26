@@ -10,6 +10,10 @@ from arena.thresholds import (BUNDLE_BUYERS_DISQUALIFIER, BUNDLE_BUYERS_WARNING,
 
 async def run(rpc: RpcClient, store, mint: str, birth: Birth,
               pair: PairInfo | None) -> Finding:
+    if birth.truncated:
+        return Finding("bundles", INFO,
+                       "Coin too established — launch history unreachable",
+                       {"truncated": True})
     if not birth.first_txs:
         if rpc.mode == "public":
             raise FeatureUnavailable("needs Helius key (Settings)")

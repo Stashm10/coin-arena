@@ -17,6 +17,7 @@ class Birth:
     created_ts: int | None = None
     first_sig_infos: list[dict] = field(default_factory=list)
     first_txs: list[dict] = field(default_factory=list)
+    truncated: bool = False
 
 
 async def fetch_birth(rpc: RpcClient, mint: str) -> Birth:
@@ -38,6 +39,9 @@ async def fetch_birth(rpc: RpcClient, mint: str) -> Birth:
     except (RpcError, TypeError, KeyError, IndexError) as exc:
         log.warning("birth: signature fetch failed for %s: %s", mint, exc)
         return birth
+
+    if pages == MAX_SIG_PAGES and len(page) == 1000:
+        birth.truncated = True
 
     if not page:
         return birth

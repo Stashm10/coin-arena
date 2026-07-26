@@ -1,3 +1,4 @@
+import httpx
 import pytest
 
 from arena.rpc import FeatureUnavailable, RpcClient, RpcError, redact
@@ -43,3 +44,14 @@ async def test_enhanced_batch():
     async with make_client(enhanced={"__by_sig__": {"s1": {"signature": "s1"}}}) as c:
         got = await RpcClient(c, "k").enhanced_batch(["s1"])
         assert got == [{"signature": "s1"}]
+
+
+async def test_malformed_200_body_raises_rpcerror():
+    # A 200 response missing both "result" and "error" must not leak a raw
+    # KeyError/TypeError past RpcClient.rpc — callers only catch RpcError.
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"jsonrpc": "2.0"})
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as c:
+        with pytest.raises(RpcError):
+            await RpcClient(c, "k").rpc("getSlot", [])
