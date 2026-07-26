@@ -17,13 +17,14 @@ def build_settings(page: ft.Page, on_back) -> ft.View:
     saved_note = ft.Text("", color=theme.VERDICT_COLORS["NO_RED_FLAGS"], size=13)
 
     def do_save(_):
-        if not key_field.value.strip():
+        key_value = (key_field.value or "").strip()
+        if not key_value:
             saved_note.value = "enter a key first"
             saved_note.color = theme.VERDICT_COLORS["AVOID"]
             page.update()
             return
         try:
-            save_key(key_field.value.strip())
+            save_key(key_value)
         except OSError as exc:
             saved_note.value = f"could not save key: {redact(str(exc))}"
             saved_note.color = theme.VERDICT_COLORS["AVOID"]

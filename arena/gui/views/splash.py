@@ -11,7 +11,9 @@ SPLASH_SECONDS = 1.5
 def build_splash(page: ft.Page, on_done) -> ft.View:
     def go():
         page.run_thread(on_done)
-    threading.Timer(SPLASH_SECONDS, go).start()
+    t = threading.Timer(SPLASH_SECONDS, go)
+    t.daemon = True
+    t.start()
     return ft.View(
         route="/splash",
         bgcolor=theme.WHITE,

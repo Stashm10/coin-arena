@@ -6,7 +6,7 @@ dependencies = ["httpx", "rich"]
 
 [project.optional-dependencies]
 dev = ["pytest", "pytest-asyncio"]
-gui = ["flet>=0.24"]
+gui = ["flet>=0.86"]
 
 [build-system]
 requires = ["setuptools"]

@@ -44,7 +44,7 @@ def build_check(page: ft.Page, on_open_settings) -> ft.View:
 
     def fail(exc):
         results.controls.clear()
-        msg = str(exc) if isinstance(exc, ValueError) else f"scan failed: {redact(str(exc))}"
+        msg = redact(str(exc)) if isinstance(exc, ValueError) else f"scan failed: {redact(str(exc))}"
         results.controls.append(ft.Text(msg, color=theme.VERDICT_COLORS["AVOID"]))
         spinner.visible = False
         check_btn.disabled = False
