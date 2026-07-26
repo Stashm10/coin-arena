@@ -2,11 +2,14 @@ import asyncio
 import logging
 import re
 import time
+from dataclasses import asdict
 
 import httpx
 
 from arena.birth import fetch_birth
 from arena.checks import run_all_checks
+from arena.features import extract_features
+from arena.model import load_model, predict_proba
 from arena.models import INFO, ScanResult
 from arena.prices import PairLookupError, fetch_pair
 from arena.rpc import RpcClient
@@ -50,6 +53,13 @@ async def check_mint(mint: str, settings: Settings, store: Store,
         price_usd=pair.price_usd if pair else None,
         symbol=pair.symbol if pair else None,
         duration_s=round(time.monotonic() - start, 2))
+    try:
+        model = load_model()
+        if model:
+            result.rug_probability = predict_proba(
+                extract_features([asdict(f) for f in findings]), model)
+    except Exception as exc:
+        log.warning("model inference failed: %s", exc)
     try:
         store.save_scan(result, creator=birth.creator,
                         funder=by_check["funding"].data.get("funder"),

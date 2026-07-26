@@ -29,3 +29,4 @@ class ScanResult:
     price_usd: float | None
     symbol: str | None
     duration_s: float
+    rug_probability: float | None = None
