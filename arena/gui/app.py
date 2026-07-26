@@ -1,0 +1,29 @@
+import flet as ft
+
+from arena.gui import theme
+from arena.gui.views.check import build_check
+from arena.gui.views.settings import build_settings
+from arena.gui.views.splash import build_splash
+
+
+def main(page: ft.Page) -> None:
+    page.title = "Coin Arena"
+    page.window.bgcolor = theme.WHITE
+    page.window.width = 640
+    page.window.height = 640
+
+    def show_check():
+        page.views.clear()
+        page.views.append(build_check(page, on_open_settings=show_settings))
+        page.update()
+
+    def show_settings():
+        page.views.append(build_settings(page, on_back=show_check))
+        page.update()
+
+    def show_splash():
+        page.views.clear()
+        page.views.append(build_splash(page, on_done=show_check))
+        page.update()
+
+    show_splash()

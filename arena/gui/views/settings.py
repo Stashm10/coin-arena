@@ -2,6 +2,7 @@ import flet as ft
 
 from arena.gui import theme
 from arena.paths import data_dir
+from arena.rpc import redact
 from arena.settings import load_settings, save_key
 
 
@@ -21,7 +22,13 @@ def build_settings(page: ft.Page, on_back) -> ft.View:
             saved_note.color = theme.VERDICT_COLORS["AVOID"]
             page.update()
             return
-        save_key(key_field.value.strip())
+        try:
+            save_key(key_field.value.strip())
+        except OSError as exc:
+            saved_note.value = f"could not save key: {redact(str(exc))}"
+            saved_note.color = theme.VERDICT_COLORS["AVOID"]
+            page.update()
+            return
         key_field.value = ""
         saved_note.value = "key set ✓"
         saved_note.color = theme.VERDICT_COLORS["NO_RED_FLAGS"]
