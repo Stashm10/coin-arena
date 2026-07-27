@@ -18,12 +18,25 @@ history, who funded the dev, and basic vitals (age, holders, liquidity).
 
 1. Go to the [**Releases**](https://github.com/Stashm10/coin-arena/releases) page and download `Coin Arena.zip`.
 2. Double-click the zip to unzip it, then drag **Coin Arena** into your **Applications** folder.
-3. **First launch:** right-click (or Control-click) the app → **Open** → **Open**.
-   macOS shows a warning because the app isn't code-signed — this is expected,
-   and you only have to do it once. After that it opens normally.
+## First launch (one-time)
 
-> The app is unsigned (code signing needs a paid Apple Developer account). If
-> you'd rather not right-click-Open, that's the reason.
+macOS blocks unsigned apps downloaded from the internet, so the first time you
+open Coin Arena you'll see a *"could not verify… malware"* warning. It's safe —
+here's how to allow it:
+
+1. Double-click **Coin Arena**. When the warning appears, click **Done**
+   (do **not** click "Move to Trash").
+2. Open **System Settings → Privacy & Security** and scroll down to the
+   **Security** section.
+3. You'll see *""Coin Arena" was blocked to protect your Mac"* with an
+   **Open Anyway** button — click it, then confirm with your password or Touch ID.
+4. Done. From now on it opens normally with a regular double-click.
+
+> **Prefer the terminal?** One command removes the warning permanently:
+> ```
+> xattr -dr com.apple.quarantine "/Applications/Coin Arena.app"
+> ```
+> (Adjust the path if the app lives somewhere other than Applications.)
 
 ## How to use it
 
