@@ -41,6 +41,12 @@ CREATE TABLE IF NOT EXISTS manual_labels (
     was_rug INTEGER NOT NULL,
     ts INTEGER NOT NULL
 );
+CREATE TABLE IF NOT EXISTS funding_edges (
+    child TEXT PRIMARY KEY,
+    parent TEXT,
+    is_root INTEGER NOT NULL DEFAULT 0,
+    resolved_ts INTEGER NOT NULL
+);
 """
 
 
@@ -166,6 +172,21 @@ class Store:
             "LEFT JOIN manual_labels m ON m.mint = s.mint "
             "ORDER BY s.ts DESC LIMIT ?", (limit,)).fetchall()
         return [dict(r) for r in rows]
+
+    def cached_edge(self, child: str) -> tuple[str | None, bool] | None:
+        row = self.conn.execute(
+            "SELECT parent, is_root FROM funding_edges WHERE child = ?",
+            (child,)).fetchone()
+        return (row["parent"], bool(row["is_root"])) if row else None
+
+    def save_edge(self, child: str, parent: str | None, is_root: bool) -> None:
+        self.conn.execute(
+            "INSERT INTO funding_edges (child, parent, is_root, resolved_ts) "
+            "VALUES (?, ?, ?, ?) ON CONFLICT(child) DO UPDATE SET "
+            "parent = excluded.parent, is_root = excluded.is_root, "
+            "resolved_ts = excluded.resolved_ts",
+            (child, parent, int(is_root), int(time.time())))
+        self.conn.commit()
 
     def close(self) -> None:
         self.conn.close()

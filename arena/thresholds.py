@@ -21,6 +21,11 @@ RUG_PRICE_RATIO = 0.10
 
 FUNDING_MAX_SIGS = 1000  # creator wallets busier than this: funding check bails
 
+FUNDING_GRAPH_HOPS = 2
+FUNDING_GRAPH_MAX_BUYERS = 20   # cap API calls: 20 buyers x 2 hops = 40 requests
+FUNDING_ROOT_TX_COUNT = 1000    # at/above this a wallet is an exchange/aggregator
+FUNDING_PAGE_SIZE = 100         # enhanced_txs page; a full page triggers a count
+
 # --- Quant Microstructure Engine ---
 QME_BASE_HAZARD_PCT_PER_HOUR = 20.0   # assumed, user-adjustable — NOT estimated
 QME_HAZARD_MULT_MINT_LIVE = 2.5       # mint authority still held by the dev
