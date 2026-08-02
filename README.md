@@ -1,7 +1,13 @@
 # Coin Arena 🐴
 
-**Pre-buy rug checks for Solana meme coins.** Paste a token's mint address and
-get a verdict in seconds — before you buy, not after.
+**Two tools for Solana meme coins.** On launch, pick one:
+
+- **Rug Pull Checker** — paste a mint address, get six checks and a verdict
+  before you buy.
+- **Quant Microstructure Engine** — paste a mint you already hold and get a
+  live exit signal computed from the coin's own trade stream.
+
+## Rug Pull Checker
 
 - 🔴 **AVOID** — a mechanical rug setup was found
 - 🟡 **CAUTION** — a couple of warning signs
@@ -11,6 +17,41 @@ It checks six things a candlestick chart can't show you: whether the dev can
 still mint or freeze the token, how concentrated the supply is, whether the
 launch was bundled by one person across many wallets, the dev wallet's launch
 history, who funded the dev, and basic vitals (age, holders, liquidity).
+
+**Trace funding graph** (optional, needs a key): walks each launch buyer's
+funding back two hops and reports the Shannon entropy of the sources. Low
+entropy means one wallet funded many buyers. It runs only when you click it,
+because it costs about 40 API calls.
+
+## Quant Microstructure Engine
+
+Paste a mint you hold and press **Watch**. Coin Arena opens a live stream of
+that coin's trades and fits a Hawkes process to them — the model used for
+earthquake aftershocks and order-flow bursts, where each event raises the
+chance of the next.
+
+Two things can trigger an **EXIT** alert (sound + notification):
+
+1. **Cascade decay** — the branching ratio η and the trade intensity λ have
+   both fallen well off their peaks and stayed there. The buying cascade is no
+   longer feeding itself.
+2. **Hazard exceeds drift** — the coin's estimated log-drift no longer
+   compensates for the assumed risk of a sudden total loss.
+
+The **assumed crash hazard** is exactly that: an assumption you set, not
+something measured from data. The arithmetic on top of it is exact; the input
+is a belief, and the app shows it as one.
+
+Sensitivity (Early / Balanced / Late) controls how much decay is required and
+for how long before the alert fires.
+
+### What it does not do
+
+- It does not predict which coin will pump.
+- It does not trade, hold keys, or touch your wallet. Every number is advisory.
+- It cannot see faster than the network: timestamps carry 50–200 ms of jitter,
+  so nothing here is millisecond-accurate.
+- It runs only while the window is open. Closing the app closes the socket.
 
 ---
 

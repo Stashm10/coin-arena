@@ -29,7 +29,8 @@ async def run(rpc: RpcClient, store, mint: str, birth: Birth,
                 buyers_by_slot[tx.get("slot", 0)].add(t["toUserAccount"])
                 all_buyers.add(t["toUserAccount"])
     worst = max((len(b) for b in buyers_by_slot.values()), default=0)
-    data = {"max_buyers_one_slot": worst, "launch_buyers": len(all_buyers)}
+    data = {"max_buyers_one_slot": worst, "launch_buyers": len(all_buyers),
+            "buyers": sorted(all_buyers)}
     msg = f"{worst} wallets bought in the same block at launch"
     if worst >= BUNDLE_BUYERS_DISQUALIFIER:
         return Finding("bundles", DISQUALIFIER, msg, data)

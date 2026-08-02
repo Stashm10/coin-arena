@@ -1,8 +1,10 @@
 import flet as ft
 
+from arena.checks.entropy import describe, funding_entropy
 from arena.engine import MINT_RE
 from arena.gui import theme
 from arena.gui.scan_worker import run_scan
+from arena.gui.trace_worker import run_trace
 from arena.gui.viewmodel import row_views, unavailable_footer, verdict_view
 from arena.model import model_info
 from arena.rpc import redact
@@ -47,6 +49,32 @@ def build_check(page: ft.Page, on_open_settings, on_open_history,
         footer = unavailable_footer(result)
         if footer:
             results.controls.append(ft.Text(footer, size=12, color=theme.MUTED))
+        bundles = next((f for f in result.findings if f.check == "bundles"), None)
+        buyers = (bundles.data.get("buyers") if bundles else None) or []
+        if buyers and load_settings().helius_key:
+            results.controls.append(ft.TextButton(
+                "Trace funding graph",
+                on_click=lambda _, b=buyers: do_trace(b)))
+
+    def show_entropy(roots):
+        entropy = funding_entropy(roots)
+        results.controls.append(ft.Text(
+            describe(entropy) if entropy else "not enough buyers to trace",
+            size=13, color=theme.INK))
+        page.update()
+
+    def show_trace_error(exc):
+        results.controls.append(ft.Text(f"trace failed: {redact(str(exc))}",
+                                        size=13, color=theme.MUTED))
+        page.update()
+
+    def do_trace(buyers):
+        results.controls.append(ft.Text("tracing funding graph…", size=13,
+                                        color=theme.MUTED))
+        page.update()
+        run_trace(mint_field.value.strip(), buyers, load_settings(),
+                  on_done=lambda r: page.run_thread(show_entropy, r),
+                  on_error=lambda e: page.run_thread(show_trace_error, e))
 
     def finish(result):
         render(result)
