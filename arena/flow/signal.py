@@ -74,6 +74,22 @@ class SignalEngine:
                hazard_ps: float) -> SignalState:
         if not self.connected:
             return self.mark_disconnected()
+
+        # Once EXIT has latched it never un-fires, no matter how thin the
+        # trade window gets afterward (e.g. trades drying up after a crash
+        # — the exact scenario this signal exists to catch). Check this
+        # before the MIN_FIT_EVENTS guard so a starved window degrades
+        # eta/lam to None rather than reverting the state to WARMUP. We
+        # still skip peak-tracking and decay/persistence bookkeeping below,
+        # since none of it can change an already-latched outcome.
+        if self.latched:
+            read = stopping_read(price_points, hazard_ps)
+            hold_drift = read.hold_drift if read else None
+            fit = fit_hawkes(times)
+            eta = fit.eta if fit else None
+            lam = intensity(times, now, fit) if fit else None
+            return self._emit(EXIT, eta, lam, hold_drift, self.reason)
+
         if len(times) < MIN_FIT_EVENTS:
             return SignalState(WARMUP, None, None, None, None, None,
                                f"warming up ({len(times)}/{MIN_FIT_EVENTS} trades)")
@@ -81,21 +97,10 @@ class SignalEngine:
         read = stopping_read(price_points, hazard_ps)
         hold_drift = read.hold_drift if read else None
 
-        # Once EXIT has latched it never un-fires, so the decay/stopping
-        # checks below are moot. We still need a live fit to keep eta/lam
-        # current in the displayed state (never stale), but we can skip
-        # straight to it without re-deriving peaks or re-running the
-        # decay/persistence logic.
-        if self.latched:
-            fit = fit_hawkes(times)
-            eta = fit.eta if fit else None
-            lam = intensity(times, now, fit) if fit else None
-            return self._emit(EXIT, eta, lam, hold_drift, self.reason)
-
         fit = fit_hawkes(times)
         if fit is None:
             return SignalState(WARMUP, None, None, None, None, None,
-                               "warming up")
+                               f"warming up ({len(times)}/{MIN_FIT_EVENTS} trades)")
         lam = intensity(times, now, fit)
         self.eta_peak = fit.eta if self.eta_peak is None else max(self.eta_peak, fit.eta)
         self.lam_peak = lam if self.lam_peak is None else max(self.lam_peak, lam)

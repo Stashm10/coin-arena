@@ -90,3 +90,35 @@ def test_sensitivity_presets_are_ordered():
                              SENSITIVITIES["late"])
     assert early.c1 > balanced.c1 > late.c1
     assert early.persist_s < balanced.persist_s < late.persist_s
+
+
+def test_exit_latch_survives_thin_window_after_crash():
+    eng = SignalEngine()
+    times = simulate_hawkes(1.0, 1.5, 2.0, 200.0, seed=5)
+    latched = eng.update(now=times[-1], times=times,
+                         price_points=_steady_points(), hazard_ps=0.01)
+    assert latched.state == EXIT
+    assert latched.reason == "hazard exceeds drift"
+
+    thin = times[:MIN_FIT_EVENTS - 5]  # trades dried up after the crash
+    starved = eng.update(now=times[-1] + 1.0, times=thin,
+                         price_points=_steady_points(), hazard_ps=0.01)
+    assert starved.state == EXIT
+    assert starved.reason == "hazard exceeds drift"
+
+    refilled = eng.update(now=times[-1] + 2.0, times=times,
+                          price_points=_steady_points(), hazard_ps=0.01)
+    assert refilled.state == EXIT
+    assert refilled.reason == "hazard exceeds drift"
+
+
+def test_disconnected_while_latched_still_suppresses_numbers():
+    eng = SignalEngine()
+    times = simulate_hawkes(1.0, 1.5, 2.0, 200.0, seed=5)
+    latched = eng.update(now=times[-1], times=times,
+                         price_points=_steady_points(), hazard_ps=0.01)
+    assert latched.state == EXIT
+
+    state = eng.mark_disconnected()
+    assert state.state == DISCONNECTED
+    assert state.eta is None and state.lam is None and state.hold_drift is None
