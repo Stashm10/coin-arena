@@ -9,7 +9,8 @@ from arena.rpc import redact
 from arena.settings import load_settings
 
 
-def build_check(page: ft.Page, on_open_settings, on_open_history) -> ft.View:
+def build_check(page: ft.Page, on_open_settings, on_open_history,
+                on_back) -> ft.View:
     mint_field = ft.TextField(label="Solana mint address", width=440,
                               text_style=ft.TextStyle(font_family="monospace"))
     check_btn = ft.FilledButton("Check", bgcolor=theme.CYAN, color=theme.WHITE)
@@ -80,6 +81,7 @@ def build_check(page: ft.Page, on_open_settings, on_open_history) -> ft.View:
     check_btn.on_click = do_check
 
     header = ft.Row([
+        ft.TextButton("Back", on_click=lambda _: on_back()),
         ft.Text("Coin Arena", size=20, weight=ft.FontWeight.W_500, color=theme.INK),
         ft.Container(expand=True),
         ft.TextButton("History", on_click=lambda _: on_open_history()),

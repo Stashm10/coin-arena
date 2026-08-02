@@ -58,21 +58,52 @@ def test_routing_splash_to_check_to_settings_and_back(monkeypatch, tmp_path):
     page = FakePage()
     main(page)
 
-    # Fire the splash auto-advance manually (deterministic, no real clock).
     FakeTimer.last_instance.fn()
-    assert len(page.views) == 1
+    assert page.views[0].route == "/modes"
+
+    page.views[0].controls[0].controls[2].on_click(None)  # Rug Pull Checker
     assert page.views[0].route == "/"
 
-    # Click "Settings" on the Check view.
-    check_view = page.views[0]
-    settings_btn = check_view.controls[0].controls[3]
+    settings_btn = page.views[0].controls[0].controls[4]
     settings_btn.on_click(None)
     assert len(page.views) == 2
     assert page.views[-1].route == "/settings"
 
-    # Click "Back" on the Settings view -> returns to a single Check view.
-    settings_view = page.views[-1]
-    back_btn = settings_view.controls[0].controls[0]
+    back_btn = page.views[-1].controls[0].controls[0]
     back_btn.on_click(None)
     assert len(page.views) == 1
     assert page.views[0].route == "/"
+
+
+def test_splash_advances_to_mode_picker(monkeypatch):
+    monkeypatch.setattr(splash_mod.threading, "Timer", FakeTimer)
+    page = FakePage()
+    main(page)
+    FakeTimer.last_instance.fn()
+    assert page.views[0].route == "/modes"
+
+
+def test_mode_picker_routes_to_rug_check_and_back(monkeypatch, tmp_path):
+    monkeypatch.setattr(splash_mod.threading, "Timer", FakeTimer)
+    monkeypatch.setenv("ARENA_DATA_DIR", str(tmp_path))
+    page = FakePage()
+    main(page)
+    FakeTimer.last_instance.fn()
+
+    picker = page.views[0]
+    picker.controls[0].controls[2].on_click(None)   # Rug Pull Checker
+    assert page.views[0].route == "/"
+
+    back_btn = page.views[0].controls[0].controls[0]
+    back_btn.on_click(None)
+    assert page.views[0].route == "/modes"
+
+
+def test_mode_picker_routes_to_qme(monkeypatch, tmp_path):
+    monkeypatch.setattr(splash_mod.threading, "Timer", FakeTimer)
+    monkeypatch.setenv("ARENA_DATA_DIR", str(tmp_path))
+    page = FakePage()
+    main(page)
+    FakeTimer.last_instance.fn()
+    page.views[0].controls[0].controls[3].on_click(None)   # QME
+    assert page.views[0].route == "/live"
