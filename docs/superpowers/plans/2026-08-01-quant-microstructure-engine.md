@@ -1367,7 +1367,7 @@ def _b58(raw: bytes) -> str:
         n, rem = divmod(n, 58)
         out = _B58[rem] + out
     pad = len(raw) - len(raw.lstrip(b"\x00"))
-    return "1" * pad + (out or "1")
+    return "1" * pad + out
 
 
 def decode_trade_event(payload_b64: str) -> TradeEvent | None:
