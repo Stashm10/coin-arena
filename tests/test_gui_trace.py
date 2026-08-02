@@ -88,3 +88,39 @@ def test_trace_failure_shows_a_redacted_message(monkeypatch):
     assert any(t.startswith("trace failed:") for t in texts)
     assert not any("SECRET" in t for t in texts)
     assert any("api-key=***" in t for t in texts)
+
+
+def test_clicking_trace_twice_fires_run_trace_exactly_once(monkeypatch):
+    view = _render(monkeypatch, _result_with_buyers())
+    calls = []
+    monkeypatch.setattr(
+        check_mod, "run_trace",
+        lambda mint, buyers, settings, on_done, on_error: calls.append(1))
+    btn = _trace_button(view)
+    btn.on_click(None)
+    btn.on_click(None)
+    assert len(calls) == 1
+
+
+def test_trace_button_is_disabled_after_the_first_click(monkeypatch):
+    view = _render(monkeypatch, _result_with_buyers())
+    monkeypatch.setattr(
+        check_mod, "run_trace",
+        lambda mint, buyers, settings, on_done, on_error:
+            on_done({f"B{i}": "whale" for i in range(6)}))
+    btn = _trace_button(view)
+    assert btn.disabled is False
+    btn.on_click(None)
+    assert btn.disabled is True
+
+
+def test_single_click_still_renders_the_entropy_sentence(monkeypatch):
+    # Regression guard: the double-click fix must not break the happy path.
+    view = _render(monkeypatch, _result_with_buyers())
+    monkeypatch.setattr(
+        check_mod, "run_trace",
+        lambda mint, buyers, settings, on_done, on_error:
+            on_done({f"B{i}": "whale" for i in range(6)}))
+    _trace_button(view).on_click(None)
+    texts = [c.value for c in _results(view).controls if hasattr(c, "value")]
+    assert any("6 of 6" in t for t in texts)

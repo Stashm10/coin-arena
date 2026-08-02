@@ -52,9 +52,9 @@ def build_check(page: ft.Page, on_open_settings, on_open_history,
         bundles = next((f for f in result.findings if f.check == "bundles"), None)
         buyers = (bundles.data.get("buyers") if bundles else None) or []
         if buyers and load_settings().helius_key:
-            results.controls.append(ft.TextButton(
-                "Trace funding graph",
-                on_click=lambda _, b=buyers: do_trace(b)))
+            trace_btn = ft.TextButton("Trace funding graph")
+            trace_btn.on_click = lambda _, b=buyers: do_trace(trace_btn, b)
+            results.controls.append(trace_btn)
 
     def show_entropy(roots):
         entropy = funding_entropy(roots)
@@ -68,7 +68,15 @@ def build_check(page: ft.Page, on_open_settings, on_open_history,
                                         size=13, color=theme.MUTED))
         page.update()
 
-    def do_trace(buyers):
+    def do_trace(btn, buyers):
+        # Guard against double-clicks / overlapping traces: the walk costs
+        # ~40 API calls, so a second concurrent run must never fire. Disabled
+        # stays disabled for the rest of this scan — results are cleared on
+        # the next scan anyway, and re-tracing the same mint would only
+        # re-spend credits on a cached, identical answer.
+        if btn.disabled:
+            return
+        btn.disabled = True
         results.controls.append(ft.Text("tracing funding graph…", size=13,
                                         color=theme.MUTED))
         page.update()
