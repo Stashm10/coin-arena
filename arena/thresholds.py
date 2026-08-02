@@ -20,3 +20,13 @@ DEAD_LIQUIDITY_USD = 1000.0
 RUG_PRICE_RATIO = 0.10
 
 FUNDING_MAX_SIGS = 1000  # creator wallets busier than this: funding check bails
+
+# --- Quant Microstructure Engine ---
+QME_BASE_HAZARD_PCT_PER_HOUR = 20.0   # assumed, user-adjustable — NOT estimated
+QME_HAZARD_MULT_MINT_LIVE = 2.5       # mint authority still held by the dev
+QME_HAZARD_MULT_CONCENTRATED = 1.8    # top-10 concentration above the warning cut
+QME_HAZARD_MULT_CREATOR_SELLING = 4.0 # creator wallet observed selling
+QME_FIT_WINDOW_EVENTS = 300
+QME_FIT_WINDOW_SECONDS = 120.0
+QME_REFIT_INTERVAL_S = 1.0
+QME_TAPE_MAXLEN = 2000
