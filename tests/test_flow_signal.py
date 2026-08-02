@@ -11,6 +11,10 @@ def _rising_points(n=60):
     return [(float(i), 1.0 + 0.05 * i) for i in range(n)]
 
 
+def _collapsing_points(n=25, price=10.0):
+    return [(float(i), price * (0.9 ** i)) for i in range(n)]
+
+
 def test_warmup_below_minimum_events():
     eng = SignalEngine()
     state = eng.update(now=10.0, times=[float(i) for i in range(5)],
@@ -110,6 +114,43 @@ def test_exit_latch_survives_thin_window_after_crash():
                           price_points=_steady_points(), hazard_ps=0.01)
     assert refilled.state == EXIT
     assert refilled.reason == "hazard exceeds drift"
+
+
+def test_stopping_rule_fires_before_hawkes_warmup():
+    # Only 25 trade events (< MIN_FIT_EVENTS=40) but the price has already
+    # collapsed underneath -- signal 2 must not wait on signal 1's warmup.
+    eng = SignalEngine()
+    times = [float(i) for i in range(25)]
+    state = eng.update(now=24.0, times=times,
+                       price_points=_collapsing_points(), hazard_ps=0.001)
+    assert state.state == EXIT
+    assert state.reason == "hazard exceeds drift"
+
+
+def test_warmup_below_fit_events_keeps_hold_drift_but_no_fit_numbers():
+    # 25 events, healthy rising price: still WARMUP (no sell signal), but the
+    # stopping-rule's hold_drift should be visible to the UI even though the
+    # Hawkes fit genuinely doesn't exist yet.
+    eng = SignalEngine()
+    times = [float(i) for i in range(25)]
+    state = eng.update(now=24.0, times=times,
+                       price_points=_rising_points(), hazard_ps=1e-9)
+    assert state.state == WARMUP
+    assert state.hold_drift is not None
+    assert state.eta is None
+    assert state.lam is None
+
+
+def test_disconnected_precedence_with_few_events_and_selling_read():
+    # DISCONNECTED must win even when there are too few events for a Hawkes
+    # fit AND the (unevaluated) stopping rule would have said sell.
+    eng = SignalEngine()
+    eng.mark_disconnected()
+    times = [float(i) for i in range(25)]
+    state = eng.update(now=24.0, times=times,
+                       price_points=_collapsing_points(), hazard_ps=0.001)
+    assert state.state == DISCONNECTED
+    assert state.eta is None and state.lam is None and state.hold_drift is None
 
 
 def test_disconnected_while_latched_still_suppresses_numbers():
