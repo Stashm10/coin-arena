@@ -6,7 +6,10 @@ from arena.flow.signal import (COOLING, DISCONNECTED, EXIT, HEATING,
 from arena.gui import theme
 from arena.gui.live_worker import start_watch
 from arena.settings import load_settings
-from arena.thresholds import QME_BASE_HAZARD_PCT_PER_HOUR
+from arena.thresholds import (QME_BASE_HAZARD_PCT_PER_HOUR,
+                              QME_HAZARD_MULT_CONCENTRATED,
+                              QME_HAZARD_MULT_CREATOR_SELLING,
+                              QME_HAZARD_MULT_MINT_LIVE)
 
 STATE_COLORS = {
     HEATING: theme.VERDICT_COLORS["NO_RED_FLAGS"],
@@ -18,12 +21,18 @@ STATE_COLORS = {
 
 
 def _readout(view):
-    return view.controls[1].controls[1]
+    # Body column: [input row, hazard toggles row, readout column].
+    return view.controls[1].controls[2]
 
 
-def render_state(view, state) -> None:
+def render_state(view, state, hazard_label: str | None = None) -> None:
     """Render a SignalState into the view's readout column. Module-level so
-    tests can drive it directly without a socket."""
+    tests can drive it directly without a socket.
+
+    hazard_label, when given, replaces the default flat-base wording with the
+    effective assumed hazard (base scaled by any active toggle multipliers).
+    It must always describe an assumption, never a measurement.
+    """
     out = _readout(view)
     out.controls.clear()
     color = STATE_COLORS.get(state.state, theme.MUTED)
@@ -41,9 +50,10 @@ def render_state(view, state) -> None:
             f"λ = {state.lam:.1f}/s (peak {state.lam_peak:.1f}/s)",
             size=13, color=theme.INK))
     if state.hold_drift is not None:
+        label = hazard_label or (
+            f"assumed crash hazard {QME_BASE_HAZARD_PCT_PER_HOUR:.0f}%/hr")
         out.controls.append(ft.Text(
-            f"hold drift = {state.hold_drift * 3600:.2f}/hr  "
-            f"(assumed crash hazard {QME_BASE_HAZARD_PCT_PER_HOUR:.0f}%/hr)",
+            f"hold drift = {state.hold_drift * 3600:.2f}/hr  {label}",
             size=13, color=theme.INK))
 
 
@@ -58,11 +68,54 @@ def build_live(page: ft.Page, on_back, on_open_sizing) -> ft.View:
     out = ft.Column(spacing=theme.GAP, width=520)
     handle_box: dict = {"handle": None}
 
+    # Manual hazard-multiplier toggles (Finding 2): lambda_c is an assumption
+    # the trader supplies, never a measurement, so these are plain checkboxes
+    # the user ticks about facts they know about the coin — no API calls, no
+    # automatic scanning. Placed in the body column (not the header row) so
+    # the header layout contract tests/test_gui_live.py relies on
+    # (Back/title/spacer/sensitivity/Sizing at fixed indices) is untouched.
+    mint_live_cb = ft.Checkbox(label="Mint authority still live", value=False)
+    concentrated_cb = ft.Checkbox(label="Supply concentrated in few wallets",
+                                  value=False)
+    creator_selling_cb = ft.Checkbox(label="Creator wallet selling",
+                                     value=False)
+    toggles_row = ft.Row([mint_live_cb, concentrated_cb, creator_selling_cb],
+                        alignment=ft.MainAxisAlignment.CENTER)
+
+    def _active_multiplier_pairs() -> list[tuple[str, float]]:
+        pairs = []
+        if mint_live_cb.value:
+            pairs.append(("mint authority live", QME_HAZARD_MULT_MINT_LIVE))
+        if concentrated_cb.value:
+            pairs.append(("concentrated supply", QME_HAZARD_MULT_CONCENTRATED))
+        if creator_selling_cb.value:
+            pairs.append(("creator selling", QME_HAZARD_MULT_CREATOR_SELLING))
+        return pairs
+
+    def _active_multipliers() -> list[float]:
+        # Read fresh on every call (not cached) so a running watch's
+        # per-evaluation hazard computation picks up a toggle flip live.
+        return [m for _, m in _active_multiplier_pairs()]
+
+    def _hazard_label() -> str:
+        pairs = _active_multiplier_pairs()
+        effective_pct = QME_BASE_HAZARD_PCT_PER_HOUR
+        for _, m in pairs:
+            effective_pct *= m
+        if not pairs:
+            return f"assumed crash hazard {effective_pct:.0f}%/hr"
+        parts = ", ".join(f"{name} ×{m:g}" for name, m in pairs)
+        return f"assumed crash hazard {effective_pct:.0f}%/hr ({parts})"
+
     def do_back(_) -> None:
         # A running watch holds a live socket + daemon thread that keeps
         # calling page.run_thread(_apply, ...) against this view even after
         # it's no longer on screen. Stop it here so navigating away actually
-        # closes the connection instead of leaking it in the background.
+        # closes the connection instead of leaking it in the background. On
+        # an OS window close (rather than Back), there is no do_back call —
+        # the socket is instead closed by the daemon worker thread dying
+        # with the process (see live_worker.WatchHandle / threading.Thread
+        # daemon=True).
         if handle_box["handle"] is not None:
             handle_box["handle"].stop()
             handle_box["handle"] = None
@@ -84,6 +137,7 @@ def build_live(page: ft.Page, on_back, on_open_sizing) -> ft.View:
             ft.Column([
                 ft.Row([mint_field, watch_btn],
                        alignment=ft.MainAxisAlignment.CENTER),
+                toggles_row,
                 out,
             ], spacing=theme.PAD,
                 horizontal_alignment=ft.CrossAxisAlignment.CENTER),
@@ -112,10 +166,11 @@ def build_live(page: ft.Page, on_back, on_open_sizing) -> ft.View:
         handle_box["handle"] = start_watch(
             mint=mint, key=key, sensitivity=sensitivity.value,
             base_hazard_pct=QME_BASE_HAZARD_PCT_PER_HOUR,
-            on_state=lambda s: page.run_thread(_apply, s))
+            on_state=lambda s: page.run_thread(_apply, s),
+            get_multipliers=_active_multipliers)
 
     def _apply(state) -> None:
-        render_state(view, state)
+        render_state(view, state, _hazard_label())
         page.update()
 
     watch_btn.on_click = do_watch

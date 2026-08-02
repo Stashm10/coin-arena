@@ -1,6 +1,7 @@
 from arena.flow.signal import DISCONNECTED, EXIT, WARMUP
 from arena.gui.live_worker import WatchHandle, start_watch
 from arena.stream.tape import TapeEvent
+from arena.thresholds import QME_HAZARD_MULT_MINT_LIVE
 
 
 def test_handle_stop_sets_the_flag():
@@ -44,6 +45,66 @@ def test_disconnect_emits_disconnected_with_no_numbers():
     handle.join(timeout=5)
     assert states[-1].state == DISCONNECTED
     assert states[-1].eta is None and states[-1].lam is None
+
+
+def test_no_get_multipliers_matches_flat_base_hazard(monkeypatch):
+    # Existing-behaviour guard: omitting get_multipliers must still behave
+    # exactly like today's flat base hazard (no multipliers applied).
+    import arena.gui.live_worker as worker_mod
+    real_hazard_per_s = worker_mod.hazard_per_s
+    seen: list[list[float]] = []
+
+    def spy(base_pct, mults):
+        seen.append(list(mults))
+        return real_hazard_per_s(base_pct, mults)
+
+    monkeypatch.setattr(worker_mod, "hazard_per_s", spy)
+    events = [TapeEvent(ts=float(i), is_buy=True, sol=0.1, price=1.0)
+              for i in range(10)]
+    ticks = iter([float(i) for i in range(200)])
+    handle = start_watch(
+        mint="M" * 44, key="K", sensitivity="balanced", base_hazard_pct=20.0,
+        on_state=lambda s: None, watch_fn=_fake_watch(events),
+        clock=lambda: next(ticks))
+    handle.join(timeout=5)
+    assert seen  # hazard_per_s was actually invoked from evaluate
+    assert all(m == [] for m in seen)
+
+
+def test_toggle_changes_hazard_on_a_running_watch(monkeypatch):
+    # The hazard multipliers must be recomputed per evaluation (not once at
+    # start_watch time) so ticking a toggle takes effect without restarting
+    # the watch.
+    import arena.gui.live_worker as worker_mod
+    real_hazard_per_s = worker_mod.hazard_per_s
+    seen: list[float] = []
+
+    def spy(base_pct, mults):
+        rate = real_hazard_per_s(base_pct, mults)
+        seen.append(rate)
+        return rate
+
+    monkeypatch.setattr(worker_mod, "hazard_per_s", spy)
+    toggle = {"mults": []}
+
+    def get_multipliers():
+        # Flip the toggle on partway through the run to prove a later
+        # evaluation picks up the change without a restart.
+        if len(seen) >= 2:
+            toggle["mults"] = [QME_HAZARD_MULT_MINT_LIVE]
+        return toggle["mults"]
+
+    events = [TapeEvent(ts=i * 0.5, is_buy=True, sol=0.1, price=1.0)
+              for i in range(30)]
+    ticks = iter([i * 0.5 for i in range(400)])
+    handle = start_watch(
+        mint="M" * 44, key="K", sensitivity="balanced", base_hazard_pct=20.0,
+        on_state=lambda s: None, watch_fn=_fake_watch(events),
+        clock=lambda: next(ticks), get_multipliers=get_multipliers)
+    handle.join(timeout=5)
+    assert seen[0] == real_hazard_per_s(20.0, [])
+    assert seen[-1] == real_hazard_per_s(20.0, [QME_HAZARD_MULT_MINT_LIVE])
+    assert seen[-1] > seen[0]
 
 
 def test_alert_fires_once_per_exit_latch(monkeypatch):

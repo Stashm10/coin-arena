@@ -2,6 +2,9 @@ import arena.gui.views.live as live_mod
 from arena.flow.signal import DISCONNECTED, EXIT, HEATING
 from arena.flow.signal import SignalState
 from arena.gui.views.live import build_live
+from arena.thresholds import (QME_HAZARD_MULT_CONCENTRATED,
+                              QME_HAZARD_MULT_CREATOR_SELLING,
+                              QME_HAZARD_MULT_MINT_LIVE)
 
 
 class FakePage:
@@ -15,12 +18,22 @@ class FakePage:
         self.update_calls += 1
 
 
+class FakeHandle:
+    def stop(self) -> None:
+        pass
+
+
 def _input_row(view):
     return view.controls[1].controls[0]
 
 
-def _readout(view):
+def _toggles(view):
+    # Body column: [input row, hazard toggles row, readout column].
     return view.controls[1].controls[1]
+
+
+def _readout(view):
+    return view.controls[1].controls[2]
 
 
 def _sensitivity(view):
@@ -93,6 +106,65 @@ def test_hazard_is_labelled_as_assumed():
                                             0.001, "cascade alive"))
     text = " ".join(c.value for c in _readout(view).controls if hasattr(c, "value"))
     assert "assumed" in text.lower()
+
+
+def test_toggling_checkbox_changes_multipliers_passed_to_start_watch(monkeypatch):
+    captured = {}
+    monkeypatch.setattr(
+        live_mod, "start_watch",
+        lambda **kw: (captured.setdefault("get_multipliers",
+                                          kw.get("get_multipliers")),
+                     FakeHandle())[1])
+    monkeypatch.setattr(live_mod, "load_settings",
+                        lambda: type("S", (), {"helius_key": "k"})())
+    view = build_live(FakePage(), on_back=lambda: None,
+                      on_open_sizing=lambda: None)
+    _input_row(view).controls[0].value = "M" * 44
+    _toggles(view).controls[0].value = True  # mint authority still live
+    _input_row(view).controls[1].on_click(None)
+    get_multipliers = captured["get_multipliers"]
+    assert get_multipliers() == [QME_HAZARD_MULT_MINT_LIVE]
+
+
+def test_no_toggles_ticked_passes_no_multipliers(monkeypatch):
+    captured = {}
+    monkeypatch.setattr(
+        live_mod, "start_watch",
+        lambda **kw: (captured.setdefault("get_multipliers",
+                                          kw.get("get_multipliers")),
+                     FakeHandle())[1])
+    monkeypatch.setattr(live_mod, "load_settings",
+                        lambda: type("S", (), {"helius_key": "k"})())
+    view = build_live(FakePage(), on_back=lambda: None,
+                      on_open_sizing=lambda: None)
+    _input_row(view).controls[0].value = "M" * 44
+    _input_row(view).controls[1].on_click(None)
+    get_multipliers = captured["get_multipliers"]
+    assert get_multipliers() == []
+
+
+def test_hazard_readout_shows_active_multiplier_labels_and_stays_assumed(
+        monkeypatch):
+    captured = {}
+    monkeypatch.setattr(
+        live_mod, "start_watch",
+        lambda **kw: (captured.setdefault("on_state", kw["on_state"]),
+                     FakeHandle())[1])
+    monkeypatch.setattr(live_mod, "load_settings",
+                        lambda: type("S", (), {"helius_key": "k"})())
+    view = build_live(FakePage(), on_back=lambda: None,
+                      on_open_sizing=lambda: None)
+    _input_row(view).controls[0].value = "M" * 44
+    _toggles(view).controls[0].value = True  # mint authority still live
+    _toggles(view).controls[2].value = True  # creator wallet selling
+    _input_row(view).controls[1].on_click(None)
+    on_state = captured["on_state"]
+    on_state(SignalState(HEATING, 0.7, 0.8, 4.0, 5.0, 0.001, "cascade alive"))
+    text = " ".join(c.value for c in _readout(view).controls if hasattr(c, "value"))
+    assert "assumed" in text.lower()
+    assert f"×{QME_HAZARD_MULT_MINT_LIVE:g}" in text
+    assert f"×{QME_HAZARD_MULT_CREATOR_SELLING:g}" in text
+    assert f"×{QME_HAZARD_MULT_CONCENTRATED:g}" not in text
 
 
 def test_sensitivity_dropdown_offers_three_presets():

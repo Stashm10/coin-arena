@@ -42,16 +42,22 @@ class WatchHandle:
 
 def start_watch(mint: str, key: str, sensitivity: str, base_hazard_pct: float,
                 on_state: Callable[[SignalState], None],
-                watch_fn=None, clock=time.monotonic) -> WatchHandle:
+                watch_fn=None, clock=time.monotonic,
+                get_multipliers: Callable[[], list[float]] | None = None
+                ) -> WatchHandle:
     handle = WatchHandle()
     watch_fn = watch_fn or watch
     tape = Tape()
     engine = SignalEngine(sensitivity)
-    hazard = hazard_per_s(base_hazard_pct, [])
+    # Multipliers are re-read on every evaluation (not computed once here) so
+    # that a running watch's manual toggles (mint live / concentrated /
+    # creator selling) take effect immediately without restarting the watch.
+    get_multipliers = get_multipliers or (lambda: [])
     last_fit = [0.0]
     alerted = [False]
 
     def evaluate(now: float) -> None:
+        hazard = hazard_per_s(base_hazard_pct, get_multipliers())
         state = engine.update(now, tape.window_times(now),
                               tape.window_prices(now), hazard)
         if state.state == EXIT and not alerted[0]:
