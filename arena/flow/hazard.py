@@ -31,11 +31,18 @@ class HazardRead:
 
 def estimate_drift(points: list[tuple[float, float]]
                    ) -> tuple[float, float] | None:
-    """(log_drift_per_second, sigma_per_second) from (timestamp, price) pairs."""
+    """(log_drift_per_second, sigma_per_second) from (timestamp, price) pairs.
+
+    Pairs with a non-positive price or a non-increasing timestamp (bad,
+    duplicate, or out-of-order ticks) are dropped. The drift denominator is
+    the time actually covered by the retained pairs (sum of their dts), not
+    the raw first-to-last window span: consecutive log-returns telescope, so
+    dropping a pair removes its return from the numerator, and dividing by
+    the full span instead of the retained coverage would silently bias the
+    drift toward zero -- exactly the failure mode a bad tick is here to
+    trigger.
+    """
     if len(points) < MIN_PRICE_POINTS:
-        return None
-    span = points[-1][0] - points[0][0]
-    if span <= 0:
         return None
     rets, dts = [], []
     for (t0, p0), (t1, p1) in zip(points, points[1:]):
@@ -45,8 +52,11 @@ def estimate_drift(points: list[tuple[float, float]]
         dts.append(t1 - t0)
     if len(rets) < 2:
         return None
-    log_drift = sum(rets) / span
-    mean_dt = sum(dts) / len(dts)
+    coverage = sum(dts)
+    if coverage <= 0:
+        return None
+    log_drift = sum(rets) / coverage
+    mean_dt = coverage / len(dts)
     var_per_step = statistics.pvariance(rets)
     sigma = math.sqrt(var_per_step / mean_dt) if mean_dt > 0 else 0.0
     return log_drift, sigma

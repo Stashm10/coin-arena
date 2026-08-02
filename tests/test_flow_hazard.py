@@ -54,3 +54,32 @@ def test_stopping_read_none_without_enough_points():
 def test_sigma_is_zero_on_a_perfectly_smooth_path():
     _, sigma = estimate_drift(_ramp(0.01))
     assert sigma < 1e-9
+
+
+def test_drift_unbiased_when_a_bad_price_tick_is_filtered_out():
+    # A non-positive price tick spliced into an otherwise clean ramp drops
+    # both pairs touching it, but must not bias the recovered rate: the
+    # denominator should track only the time actually covered by the
+    # retained returns, not the raw first-to-last window span.
+    clean = _ramp(0.01)
+    dirty = clean[:30] + [(29.5, -1.0)] + clean[30:]
+    clean_drift, _ = estimate_drift(clean)
+    dirty_drift, _ = estimate_drift(dirty)
+    assert abs(dirty_drift - clean_drift) < 1e-9
+
+
+def test_drift_unbiased_when_a_non_increasing_timestamp_pair_is_filtered():
+    # A duplicated (t, price) tick creates a zero/negative-dt pair that must
+    # be dropped without corrupting the rest of the estimate.
+    clean = _ramp(0.01)
+    dirty = clean[:30] + [clean[29]] + clean[30:]
+    clean_drift, _ = estimate_drift(clean)
+    dirty_drift, _ = estimate_drift(dirty)
+    assert abs(dirty_drift - clean_drift) < 1e-9
+
+
+def test_none_when_filtering_leaves_fewer_than_two_usable_returns():
+    # Nearly all points share one timestamp (filtered as non-increasing);
+    # only the final pair is usable, which is below the len(rets) >= 2 floor.
+    points = [(0.0, 1.0)] * (MIN_PRICE_POINTS - 1) + [(1.0, math.e)]
+    assert estimate_drift(points) is None
