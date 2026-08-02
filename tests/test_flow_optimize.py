@@ -31,3 +31,17 @@ def test_handles_non_finite_scores_without_crashing():
     point, score = nelder_mead(f, [1.0])
     assert abs(point[0] - 2.0) < 1e-3
     assert math.isfinite(score)
+
+
+def test_finds_minimum_of_3d_chained_rosenbrock():
+    """3D test covering the case Task 2 (Hawkes fit) will use: 3 parameters with step=0.6, max_iter=600."""
+    def f(p):
+        # Chained Rosenbrock: min at (1, 1, 1)
+        return ((1 - p[0]) ** 2 + 100 * (p[1] - p[0] ** 2) ** 2 +
+                (1 - p[1]) ** 2 + 100 * (p[2] - p[1] ** 2) ** 2)
+
+    point, _ = nelder_mead(f, [-0.5, -0.5, -0.5], step=0.6, max_iter=600)
+    assert len(point) == 3
+    assert abs(point[0] - 1.0) < 1e-2
+    assert abs(point[1] - 1.0) < 1e-2
+    assert abs(point[2] - 1.0) < 1e-2
