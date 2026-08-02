@@ -88,9 +88,12 @@ testable offline with synthetic data and no API key.
 Neither door imports the other. Shared: `rpc.py`, `store.py`, `settings.py`,
 `gui/theme.py`.
 
-**Dependencies: none added.** All math is pure-Python stdlib. `scikit-learn`
-stays confined to the optional `ml` extra used by the offline trainer, so the
-packaged `.app` does not grow.
+**Dependencies: one added.** All math is pure-Python stdlib — no numpy, no
+scipy. The stream layer needs a WebSocket client, which `httpx` does not
+provide, so `websockets` (pure Python, no compiled extensions) is added to the
+base dependencies. `scikit-learn` stays confined to the optional `ml` extra
+used by the offline trainer. Alerts use `subprocess` against macOS `afplay` and
+`osascript`, adding nothing.
 
 ## 5. Module: exit engine
 
