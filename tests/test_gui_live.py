@@ -1,10 +1,14 @@
 import arena.gui.views.live as live_mod
-from arena.flow.signal import DISCONNECTED, EXIT, HEATING
+from arena.flow.signal import DISCONNECTED, EXIT, HEATING, SignalEngine
 from arena.flow.signal import SignalState
 from arena.gui.views.live import build_live
 from arena.thresholds import (QME_HAZARD_MULT_CONCENTRATED,
                               QME_HAZARD_MULT_CREATOR_SELLING,
                               QME_HAZARD_MULT_MINT_LIVE)
+
+
+def _collapsing_points(n=25, price=10.0):
+    return [(float(i), price * (0.9 ** i)) for i in range(n)]
 
 
 class FakePage:
@@ -106,6 +110,44 @@ def test_hazard_is_labelled_as_assumed():
                                             0.001, "cascade alive"))
     text = " ".join(c.value for c in _readout(view).controls if hasattr(c, "value"))
     assert "assumed" in text.lower()
+
+
+def test_render_state_does_not_crash_when_eta_is_set_but_peak_is_none():
+    # Defensive: render_state must degrade gracefully, never raise, on a
+    # state with eta/lam set but eta_peak/lam_peak None. The engine should
+    # no longer emit this in practice (see test_flow_signal.py's
+    # test_latched_state_backfills_peaks_once_a_fit_becomes_available), but
+    # this render callback runs on every tick during EXIT and must not be
+    # able to take the window down if it ever does.
+    view = build_live(FakePage(), on_back=lambda: None,
+                      on_open_sizing=lambda: None)
+    live_mod.render_state(view, SignalState(EXIT, 0.71, None, 10.2, None,
+                                            -0.1, "hazard exceeds drift"))
+    text = " ".join(c.value for c in _readout(view).controls if hasattr(c, "value"))
+    assert "EXIT" in text
+
+
+def test_latched_growth_past_min_fit_events_renders_without_crashing():
+    # Full-stack regression: fast-rug latch under MIN_FIT_EVENTS (peaks
+    # None), then continued trading past MIN_FIT_EVENTS while still
+    # latched. eta/lam become numbers once a fit succeeds; rendering the
+    # resulting state must not raise.
+    eng = SignalEngine()
+    few_times = [float(i) for i in range(25)]
+    latched = eng.update(now=24.0, times=few_times,
+                         price_points=_collapsing_points(n=25),
+                         hazard_ps=0.001)
+    assert latched.state == EXIT
+
+    many_times = [float(i) for i in range(50)]
+    grown = eng.update(now=49.0, times=many_times,
+                       price_points=_collapsing_points(n=50), hazard_ps=0.001)
+    assert grown.state == EXIT
+    assert grown.eta is not None
+
+    view = build_live(FakePage(), on_back=lambda: None,
+                      on_open_sizing=lambda: None)
+    live_mod.render_state(view, grown)  # must not raise
 
 
 def test_toggling_checkbox_changes_multipliers_passed_to_start_watch(monkeypatch):

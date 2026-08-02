@@ -127,6 +127,34 @@ def test_stopping_rule_fires_before_hawkes_warmup():
     assert state.reason == "hazard exceeds drift"
 
 
+def test_latched_state_backfills_peaks_once_a_fit_becomes_available():
+    # Regression: a fast-rug latch fires under MIN_FIT_EVENTS, so eta_peak/
+    # lam_peak start out None. If trading continues while still latched and
+    # the window later crosses MIN_FIT_EVENTS, _degraded_fit starts
+    # returning real eta/lam -- the peaks must not be left at None forever,
+    # or any renderer formatting "peak {eta_peak:.2f}" crashes.
+    eng = SignalEngine()
+    few_times = [float(i) for i in range(25)]
+    latched = eng.update(now=24.0, times=few_times,
+                         price_points=_collapsing_points(n=25),
+                         hazard_ps=0.001)
+    assert latched.state == EXIT
+    assert latched.eta is None
+    assert latched.eta_peak is None
+    assert latched.lam_peak is None
+
+    many_times = [float(i) for i in range(50)]
+    grown = eng.update(now=49.0, times=many_times,
+                       price_points=_collapsing_points(n=50), hazard_ps=0.001)
+    assert grown.state == EXIT
+    assert grown.eta is not None
+    assert grown.lam is not None
+    # The state must stay internally coherent: whenever eta/lam are set,
+    # eta_peak/lam_peak must be too.
+    assert grown.eta_peak is not None
+    assert grown.lam_peak is not None
+
+
 def test_warmup_below_fit_events_keeps_hold_drift_but_no_fit_numbers():
     # 25 events, healthy rising price: still WARMUP (no sell signal), but the
     # stopping-rule's hold_drift should be visible to the UI even though the

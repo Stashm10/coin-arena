@@ -88,6 +88,25 @@ class SignalEngine:
         lam = intensity(times, now, fit) if fit else None
         return fit, eta, lam
 
+    def _backfill_peaks(self, fit, lam: float | None) -> None:
+        """Seed eta_peak/lam_peak from a newly available fit, or keep
+        tracking the running max if they're already set.
+
+        A fast-rug latch can fire before MIN_FIT_EVENTS trades exist, so
+        eta_peak/lam_peak start out None on that EXIT. If trading continues
+        while still latched and the window later crosses MIN_FIT_EVENTS,
+        _degraded_fit starts returning real eta/lam — without this, the
+        peaks would stay None forever while eta/lam become numbers, an
+        incoherent state that crashes any renderer formatting "peak
+        {eta_peak:.2f}". Treat the first available fit as this session's
+        first observation and seed from it, exactly like the non-latched
+        path's peak-tracking.
+        """
+        if fit is None:
+            return
+        self.eta_peak = fit.eta if self.eta_peak is None else max(self.eta_peak, fit.eta)
+        self.lam_peak = lam if self.lam_peak is None else max(self.lam_peak, lam)
+
     def update(self, now: float, times: list[float],
                price_points: list[tuple[float, float]],
                hazard_ps: float) -> SignalState:
@@ -100,10 +119,14 @@ class SignalEngine:
         # Once EXIT has latched it never un-fires, no matter how thin the
         # trade window gets afterward (e.g. trades drying up after a crash
         # — the exact scenario this signal exists to catch). We still skip
-        # peak-tracking and decay/persistence bookkeeping below, since none
-        # of it can change an already-latched outcome.
+        # decay/persistence bookkeeping below, since none of it can change
+        # an already-latched outcome. We do NOT skip peak backfilling: a
+        # fast-rug latch can fire before a fit ever existed (peaks None),
+        # and if trading continues past MIN_FIT_EVENTS while still latched,
+        # eta/lam need a peak to report against once one becomes available.
         if self.latched:
-            _, eta, lam = self._degraded_fit(times, now)
+            fit, eta, lam = self._degraded_fit(times, now)
+            self._backfill_peaks(fit, lam)
             return self._emit(EXIT, eta, lam, hold_drift, self.reason)
 
         # Signal 2 (stopping rule) needs only MIN_PRICE_POINTS price points,
@@ -115,9 +138,7 @@ class SignalEngine:
             self.latched = True
             self.reason = "hazard exceeds drift"
             fit, eta, lam = self._degraded_fit(times, now)
-            if fit is not None:
-                self.eta_peak = fit.eta if self.eta_peak is None else max(self.eta_peak, fit.eta)
-                self.lam_peak = lam if self.lam_peak is None else max(self.lam_peak, lam)
+            self._backfill_peaks(fit, lam)
             return self._emit(EXIT, eta, lam, hold_drift, self.reason)
 
         # fit_hawkes already self-guards on MIN_FIT_EVENTS, so a single None

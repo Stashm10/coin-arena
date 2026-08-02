@@ -45,9 +45,16 @@ def render_state(view, state, hazard_label: str | None = None) -> None:
         return
     out.controls.append(ft.Text(state.reason, size=13, color=theme.MUTED))
     if state.eta is not None:
+        # Defensive: the engine backfills peaks whenever eta/lam are set, so
+        # eta_peak/lam_peak should never be None here in practice. Format
+        # defensively anyway rather than crash on an f"{None:.2f}" — this
+        # render callback runs on every tick during EXIT and must not be
+        # able to take the window down.
+        eta_peak = f"{state.eta_peak:.2f}" if state.eta_peak is not None else "—"
+        lam_peak = f"{state.lam_peak:.1f}" if state.lam_peak is not None else "—"
         out.controls.append(ft.Text(
-            f"η = {state.eta:.2f} (peak {state.eta_peak:.2f})   "
-            f"λ = {state.lam:.1f}/s (peak {state.lam_peak:.1f}/s)",
+            f"η = {state.eta:.2f} (peak {eta_peak})   "
+            f"λ = {state.lam:.1f}/s (peak {lam_peak})",
             size=13, color=theme.INK))
     if state.hold_drift is not None:
         label = hazard_label or (
