@@ -9,9 +9,9 @@ stale numbers.
 import asyncio
 import json
 import logging
-import threading
 import time
 from collections.abc import Callable
+from typing import Protocol
 
 from arena.stream.decode import event_from_logs
 from arena.stream.tape import TapeEvent
@@ -27,6 +27,16 @@ PING_TIMEOUT_S = 10
 
 class Disconnected(Exception):
     pass
+
+
+class StopFlag(Protocol):
+    """Duck-typed stop signal — only `.is_set()` is required. If the object
+    also exposes a callable `.wait(timeout) -> bool` (as `threading.Event`
+    does), `watch` uses it to sleep out the reconnect backoff interruptibly
+    instead of a plain `asyncio.sleep`, so shutdown is noticed the instant
+    the flag is set rather than after up to BACKOFF_MAX_S seconds."""
+
+    def is_set(self) -> bool: ...
 
 
 def ws_url(key: str) -> str:
@@ -64,7 +74,7 @@ async def _default_connect(url: str):
 async def watch(key: str, mint: str, on_event: Callable[[TapeEvent], None],
                 on_disconnect: Callable[[], None],
                 on_reconnect: Callable[[], None],
-                stop: threading.Event,
+                stop: StopFlag,
                 connect: Callable[[str], object] | None = None,
                 clock: Callable[[], float] = time.monotonic) -> None:
     connect = connect or _default_connect
@@ -88,5 +98,12 @@ async def watch(key: str, mint: str, on_event: Callable[[TapeEvent], None],
         except Exception as exc:
             log.warning("stream dropped: %s", exc)
             on_disconnect()
-            await asyncio.sleep(backoff)
+            wait = getattr(stop, "wait", None)
+            if callable(wait):
+                # Blocking Event.wait() run off-loop so it can return the
+                # instant stop is set, instead of sleeping the full backoff.
+                await asyncio.get_running_loop().run_in_executor(
+                    None, wait, backoff)
+            else:
+                await asyncio.sleep(backoff)
             backoff = min(backoff * 2, BACKOFF_MAX_S)

@@ -1,6 +1,7 @@
 import base64
 import json
 import struct
+import time
 
 from arena.stream.subscribe import (parse_notification, subscription_payload,
                                     watch, ws_url)
@@ -56,6 +57,24 @@ class Stop:
     def is_set(self):
         self.calls += 1
         return self.calls > self.after
+
+
+class WaitStop:
+    """Mimics threading.Event: exposes both is_set() and a wait(timeout)
+    that returns True immediately, to prove watch() prefers the blocking
+    wait over asyncio.sleep when it is available."""
+
+    def __init__(self):
+        self.calls = 0
+        self.wait_calls = []
+
+    def is_set(self):
+        self.calls += 1
+        return self.calls > 1
+
+    def wait(self, timeout):
+        self.wait_calls.append(timeout)
+        return True
 
 
 def test_ws_url_uses_helius_mainnet_and_key():
@@ -154,3 +173,24 @@ async def test_watch_stops_when_stop_is_set():
                 on_disconnect=lambda: None, on_reconnect=lambda: None,
                 stop=AlwaysStop(), connect=connect)
     assert calls["n"] == 0
+
+
+async def test_watch_uses_stop_wait_for_backoff_when_available():
+    """When stop exposes a callable wait(timeout) (as threading.Event does),
+    watch must use it instead of a plain asyncio.sleep, so shutdown during
+    the reconnect backoff is noticed immediately rather than after up to
+    BACKOFF_MAX_S seconds."""
+    socket = FakeSocket([], fail_after=True)
+
+    async def connect(url):
+        return socket
+
+    stop = WaitStop()
+    started = time.monotonic()
+    await watch("KEY", "M", on_event=lambda e: None,
+                on_disconnect=lambda: None, on_reconnect=lambda: None,
+                stop=stop, connect=connect)
+    elapsed = time.monotonic() - started
+
+    assert stop.wait_calls == [1.0]  # called with BACKOFF_START_S
+    assert elapsed < 0.5  # returned promptly, did not sleep the backoff
