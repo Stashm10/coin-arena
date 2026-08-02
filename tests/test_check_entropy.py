@@ -44,3 +44,26 @@ def test_describe_states_the_dominant_cluster():
 def test_describe_for_independent_buyers():
     text = describe(funding_entropy({f"b{i}": f"r{i}" for i in range(6)}))
     assert "6 distinct" in text
+
+
+def test_describe_is_honest_about_truncated_sampling_dominant_cluster():
+    # Only 20 of the coin's 45 launch buyers were traced (FUNDING_GRAPH_MAX_
+    # BUYERS truncation) -- the sentence must not imply the full 45 were seen.
+    roots = {f"b{i}": ("whale" if i < 12 else f"r{i}") for i in range(20)}
+    text = describe(funding_entropy(roots), total_launch_buyers=45)
+    assert "20" in text and "45" in text
+    assert "12" in text
+
+
+def test_describe_is_honest_about_truncated_sampling_independent_buyers():
+    roots = {f"b{i}": f"r{i}" for i in range(20)}
+    text = describe(funding_entropy(roots), total_launch_buyers=45)
+    assert "20" in text and "45" in text
+
+
+def test_describe_unchanged_when_total_equals_traced():
+    # No truncation happened (total == traced): wording matches the
+    # no-argument call exactly.
+    roots = {f"b{i}": ("whale" if i < 12 else f"r{i}") for i in range(15)}
+    result = funding_entropy(roots)
+    assert describe(result, total_launch_buyers=15) == describe(result)

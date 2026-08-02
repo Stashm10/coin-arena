@@ -56,10 +56,11 @@ def build_check(page: ft.Page, on_open_settings, on_open_history,
             trace_btn.on_click = lambda _, b=buyers: do_trace(trace_btn, b)
             results.controls.append(trace_btn)
 
-    def show_entropy(roots):
+    def show_entropy(roots, total_launch_buyers):
         entropy = funding_entropy(roots)
         results.controls.append(ft.Text(
-            describe(entropy) if entropy else "not enough buyers to trace",
+            describe(entropy, total_launch_buyers) if entropy
+            else "not enough buyers to trace",
             size=13, color=theme.INK))
         page.update()
 
@@ -80,8 +81,15 @@ def build_check(page: ft.Page, on_open_settings, on_open_history,
         results.controls.append(ft.Text("tracing funding graph…", size=13,
                                         color=theme.MUTED))
         page.update()
+        # buyers is the full, untruncated launch-buyer list (bundles.py sets
+        # launch_buyers = len(all_buyers) = len(buyers)); resolve_roots()
+        # itself caps how many of them it actually traces at
+        # FUNDING_GRAPH_MAX_BUYERS, so its result dict can come back smaller.
+        # Pass the true count through so describe() can say "sampled"
+        # honestly instead of implying the whole set was traced.
         run_trace(mint_field.value.strip(), buyers, load_settings(),
-                  on_done=lambda r: page.run_thread(show_entropy, r),
+                  on_done=lambda r: page.run_thread(show_entropy, r,
+                                                    len(buyers)),
                   on_error=lambda e: page.run_thread(show_trace_error, e))
 
     def finish(result):
