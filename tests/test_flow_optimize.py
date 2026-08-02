@@ -45,3 +45,21 @@ def test_finds_minimum_of_3d_chained_rosenbrock():
     assert abs(point[0] - 1.0) < 1e-2
     assert abs(point[1] - 1.0) < 1e-2
     assert abs(point[2] - 1.0) < 1e-2
+
+
+def test_avoids_premature_termination_on_shallow_ridge():
+    """Regression test for shallow-ridge premature termination.
+
+    The diameter-check fix prevents convergence being declared when function-value
+    spread is small but simplex vertices cluster only in steep directions, leaving
+    shallow (nearly-flat) directions far from optimum. Without diameter check, the old
+    algorithm stops with ~0.339 error in p[1]; with the fix, it converges to ~1e-7.
+    """
+    def f(p):
+        # Mismatched curvature: steep in p[0], nearly-flat in p[1]
+        return 1e6 * (p[0] - 1.0) ** 2 + 1e-6 * (p[1] - 1.0) ** 2
+
+    point, _ = nelder_mead(f, [0.0, 0.0])
+    # Old value-only termination fails this assertion (p[1] ~0.661)
+    # New diameter-check termination passes (p[1] ~1.0)
+    assert abs(point[1] - 1.0) < 1e-3
