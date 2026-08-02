@@ -6,6 +6,7 @@ from arena.gui.views.history import build_history
 from arena.gui.views.live import build_live
 from arena.gui.views.mode_picker import build_mode_picker
 from arena.gui.views.settings import build_settings
+from arena.gui.views.sizing import build_sizing
 from arena.gui.views.splash import build_splash
 
 
@@ -30,7 +31,12 @@ def main(page: ft.Page) -> None:
 
     def show_live():
         page.views.clear()
-        page.views.append(build_live(page, on_back=show_modes))
+        page.views.append(build_live(page, on_back=show_modes,
+                                     on_open_sizing=show_sizing))
+        page.update()
+
+    def show_sizing():
+        page.views.append(build_sizing(page, on_back=show_live))
         page.update()
 
     def show_history():

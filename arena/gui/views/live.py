@@ -47,7 +47,7 @@ def render_state(view, state) -> None:
             size=13, color=theme.INK))
 
 
-def build_live(page: ft.Page, on_back) -> ft.View:
+def build_live(page: ft.Page, on_back, on_open_sizing) -> ft.View:
     mint_field = ft.TextField(label="Mint address you hold", width=380,
                               text_style=ft.TextStyle(font_family="monospace"))
     watch_btn = ft.FilledButton("Watch", bgcolor=theme.CYAN, color=theme.WHITE)
@@ -79,6 +79,7 @@ def build_live(page: ft.Page, on_back) -> ft.View:
                         weight=ft.FontWeight.W_500, color=theme.INK),
                 ft.Container(expand=True),
                 sensitivity,
+                ft.TextButton("Sizing", on_click=lambda _: on_open_sizing()),
             ]),
             ft.Column([
                 ft.Row([mint_field, watch_btn],
