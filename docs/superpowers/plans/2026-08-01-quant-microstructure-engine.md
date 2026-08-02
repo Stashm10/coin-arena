@@ -2351,6 +2351,13 @@ async def resolve_roots(rpc: RpcClient, store: Store, buyers: list[str],
         for _ in range(hops):
             parent, parent_is_root = await funder_of(rpc, store, current)
             if parent is None:
+                if parent_is_root:
+                    # `current` is ITSELF an exchange/aggregator. Same rule as
+                    # below: a shared venue is not a shared source, so the buyer
+                    # maps to itself. Without this branch a busy aggregator
+                    # discovered on hop 2+ collapses every buyer through it into
+                    # one root — the exact false alarm this module prevents.
+                    current = buyer
                 break
             if parent_is_root:
                 # The exchange is a root, but each withdrawal is independent —
