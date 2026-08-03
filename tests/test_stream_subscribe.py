@@ -194,3 +194,24 @@ async def test_watch_uses_stop_wait_for_backoff_when_available():
 
     assert stop.wait_calls == [1.0]  # called with BACKOFF_START_S
     assert elapsed < 0.5  # returned promptly, did not sleep the backoff
+
+
+def test_ssl_context_uses_certifi_bundle():
+    """python.org Python ships no CA certs, so the stdlib default context
+    fails every wss:// handshake. Regression guard for a bug that made the
+    engine unable to connect at all on a stock macOS install — invisible to
+    every other test here, because they all inject a fake socket."""
+    import ssl as ssl_mod
+
+    import certifi
+
+    from arena.stream.subscribe import _ssl_context
+
+    ctx = _ssl_context()
+    assert isinstance(ctx, ssl_mod.SSLContext)
+    assert ctx.verify_mode == ssl_mod.CERT_REQUIRED
+    # The certifi bundle must actually be loaded, not just the default store.
+    loaded = {c["subject"] for c in ctx.get_ca_certs()}
+    bundle = ssl_mod.create_default_context(cafile=certifi.where())
+    assert loaded == {c["subject"] for c in bundle.get_ca_certs()}
+    assert loaded, "no CA certificates loaded — handshakes would fail"

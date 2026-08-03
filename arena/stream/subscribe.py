@@ -9,9 +9,12 @@ stale numbers.
 import asyncio
 import json
 import logging
+import ssl
 import time
 from collections.abc import Callable
 from typing import Protocol
+
+import certifi
 
 from arena.stream.decode import event_from_logs
 from arena.stream.tape import TapeEvent
@@ -65,9 +68,21 @@ def parse_notification(message: str, now: float) -> TapeEvent | None:
                      price=trade.price)
 
 
+def _ssl_context() -> ssl.SSLContext:
+    """CA bundle from certifi rather than the system default.
+
+    python.org Python builds ship no CA certificates, so the stdlib default
+    context fails every wss:// handshake with CERTIFICATE_VERIFY_FAILED. httpx
+    never hits this because it uses certifi itself; `websockets` uses the
+    stdlib default, so we have to supply the bundle explicitly or the engine
+    cannot connect at all on a stock macOS python.org install."""
+    return ssl.create_default_context(cafile=certifi.where())
+
+
 async def _default_connect(url: str):
     import websockets
-    return await websockets.connect(url, ping_interval=PING_INTERVAL_S,
+    return await websockets.connect(url, ssl=_ssl_context(),
+                                    ping_interval=PING_INTERVAL_S,
                                     ping_timeout=PING_TIMEOUT_S)
 
 
