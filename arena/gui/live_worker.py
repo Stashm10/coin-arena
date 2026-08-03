@@ -68,7 +68,8 @@ def start_watch(mint: str, key: str, sensitivity: str, base_hazard_pct: float,
 
         def start(self) -> None: ...
         def note_price(self, price) -> None: ...
-        def note_state(self, state) -> None: ...
+        def note_state(self, state, hazard_ps: float | None = None) -> None: ...
+        def finish(self) -> None: ...
 
     recorder_box: list = [_NullRecorder()]
 
@@ -90,7 +91,7 @@ def start_watch(mint: str, key: str, sensitivity: str, base_hazard_pct: float,
             fire_alert("EXIT", state.reason)
         on_state(state)
         # After on_state: the display must never wait on a disk write.
-        _safely("note_state", state)
+        _safely("note_state", state, hazard)
 
     def on_event(event) -> None:
         tape.append(event)
@@ -132,7 +133,12 @@ def start_watch(mint: str, key: str, sensitivity: str, base_hazard_pct: float,
         except Exception as exc:
             log.warning("session recorder unavailable: %s", exc)
         _safely("start")
-        asyncio.run(run())
+        try:
+            asyncio.run(run())
+        finally:
+            # Runs whether the watch ends normally or by exception, so a
+            # session's duration is always knowable.
+            _safely("finish")
 
     handle.thread = threading.Thread(target=worker, daemon=True)
     handle.thread.start()

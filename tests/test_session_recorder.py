@@ -8,7 +8,9 @@ class FakeState:
     state: str
     reason: str
     eta: float | None = None
+    eta_peak: float | None = None
     lam: float | None = None
+    lam_peak: float | None = None
     hold_drift: float | None = None
 
 
@@ -17,6 +19,7 @@ class FakeStore:
         self.sessions = []
         self.signals = []
         self.entry_prices = []
+        self.ended = []
         self.fail_on = fail_on or set()
 
     def start_watch_session(self, mint, started_ts, sensitivity, hazard_pct,
@@ -31,11 +34,18 @@ class FakeStore:
             raise RuntimeError("db locked")
         self.entry_prices.append((session_id, price))
 
+    def end_watch_session(self, session_id, ended_ts):
+        if "finish" in self.fail_on:
+            raise RuntimeError("db locked")
+        self.ended.append((session_id, ended_ts))
+
     def record_watch_signal(self, session_id, ts, state, reason, eta, lam,
-                            hold_drift):
+                            hold_drift, hazard_per_s=None, eta_peak=None,
+                            lam_peak=None):
         if "signal" in self.fail_on:
             raise RuntimeError("db locked")
-        self.signals.append((session_id, ts, state, reason, eta, lam, hold_drift))
+        self.signals.append((session_id, ts, state, reason, eta, lam,
+                             hold_drift, hazard_per_s, eta_peak, lam_peak))
 
 
 def _recorder(store, **kw):
@@ -146,3 +156,73 @@ def test_notes_before_start_are_ignored():
     rec.note_price(1.0)
     assert store.signals == []
     assert store.entry_prices == []
+
+
+def test_finish_records_the_end_of_the_session():
+    """Finding 1: nothing recorded when a watch stopped means duration is
+    unknowable. finish() must write ended_ts."""
+    store = FakeStore()
+    rec = _recorder(store)
+    rec.start()
+    rec.finish()
+    assert store.ended == [(1, 1000)]
+
+
+def test_finish_before_start_is_ignored():
+    store = FakeStore()
+    rec = _recorder(store)
+    rec.finish()  # must not raise
+    assert store.ended == []
+
+
+def test_a_failing_finish_does_not_raise():
+    store = FakeStore(fail_on={"finish"})
+    rec = _recorder(store)
+    rec.start()
+    rec.finish()  # must not raise
+    assert store.ended == []
+
+
+def test_note_state_records_the_effective_hazard_used():
+    """Finding 2: get_multipliers() is re-read on every evaluation, so only
+    the per-signal hazard (not the session-level toggle snapshot) says what
+    actually produced a given transition."""
+    store = FakeStore()
+    rec = _recorder(store)
+    rec.start()
+    rec.note_state(FakeState("HEATING", "cascade alive"), hazard_ps=0.0031)
+    assert store.signals[0][7] == 0.0031
+
+
+def test_note_state_defaults_hazard_to_none():
+    """Default keeps existing call sites (and this file's other tests)
+    valid without passing a hazard."""
+    store = FakeStore()
+    rec = _recorder(store)
+    rec.start()
+    rec.note_state(FakeState("HEATING", "cascade alive"))
+    assert store.signals[0][7] is None
+
+
+def test_hazard_change_alone_is_not_a_new_transition():
+    """The dedup key stays (state, reason) — a hazard_ps change must not by
+    itself create a new row."""
+    store = FakeStore()
+    rec = _recorder(store)
+    rec.start()
+    rec.note_state(FakeState("HEATING", "cascade alive"), hazard_ps=0.001)
+    rec.note_state(FakeState("HEATING", "cascade alive"), hazard_ps=0.002)
+    assert len(store.signals) == 1
+
+
+def test_note_state_records_eta_peak_and_lam_peak():
+    """Finding 3: the cascade-decay signal fires by comparing eta/lam
+    against their peaks, so persisting only eta/lam loses the
+    fraction-of-peak that triggered it."""
+    store = FakeStore()
+    rec = _recorder(store)
+    rec.start()
+    rec.note_state(FakeState("EXIT", "cascade decay", eta=0.3, eta_peak=0.9,
+                             lam=1.0, lam_peak=5.0))
+    assert store.signals[0][8] == 0.9
+    assert store.signals[0][9] == 5.0

@@ -56,9 +56,13 @@ class SessionRecorder:
         except Exception as exc:
             log.warning("entry price not recorded: %s", exc)
 
-    def note_state(self, state) -> None:
+    def note_state(self, state, hazard_ps: float | None = None) -> None:
         if self.session_id is None:
             return
+        # hazard_ps is intentionally excluded from the dedup key:
+        # get_multipliers() can change the effective hazard on every
+        # evaluation, but a hazard change alone is not a state transition
+        # and must not spam new rows.
         key = (state.state, state.reason)
         if key == self._last_key:
             return
@@ -66,6 +70,15 @@ class SessionRecorder:
         try:
             self._store.record_watch_signal(
                 self.session_id, int(self._now()), state.state, state.reason,
-                state.eta, state.lam, state.hold_drift)
+                state.eta, state.lam, state.hold_drift, hazard_ps,
+                state.eta_peak, state.lam_peak)
         except Exception as exc:
             log.warning("signal not recorded: %s", exc)
+
+    def finish(self) -> None:
+        if self.session_id is None:
+            return
+        try:
+            self._store.end_watch_session(self.session_id, int(self._now()))
+        except Exception as exc:
+            log.warning("session end not recorded: %s", exc)

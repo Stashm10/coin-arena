@@ -55,7 +55,8 @@ CREATE TABLE IF NOT EXISTS watch_sessions (
     sensitivity TEXT NOT NULL,
     hazard_pct REAL NOT NULL,
     toggles TEXT NOT NULL,
-    resolved_ts INTEGER
+    resolved_ts INTEGER,
+    ended_ts INTEGER
 );
 CREATE TABLE IF NOT EXISTS watch_signals (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -65,11 +66,27 @@ CREATE TABLE IF NOT EXISTS watch_signals (
     reason TEXT NOT NULL,
     eta REAL,
     lam REAL,
-    hold_drift REAL
+    hold_drift REAL,
+    hazard_per_s REAL,
+    eta_peak REAL,
+    lam_peak REAL
 );
 CREATE INDEX IF NOT EXISTS idx_watch_signals_session
     ON watch_signals(session_id, ts);
 """
+
+# Columns added to the two watch_* tables after they first shipped. A user's
+# real database may already contain watch_sessions/watch_signals created by
+# an earlier version of this schema — CREATE TABLE IF NOT EXISTS above will
+# not add columns to a table that already exists, so _migrate adds any of
+# these that are missing, on every Store() open. Idempotent: it checks
+# PRAGMA table_info before each ALTER TABLE.
+_NEW_COLUMNS = {
+    "watch_sessions": [("ended_ts", "INTEGER")],
+    "watch_signals": [("hazard_per_s", "REAL"),
+                       ("eta_peak", "REAL"),
+                       ("lam_peak", "REAL")],
+}
 
 
 class Store:
@@ -77,6 +94,17 @@ class Store:
         self.conn = sqlite3.connect(path or data_dir() / "arena.db")
         self.conn.row_factory = sqlite3.Row
         self.conn.executescript(SCHEMA)
+        self._migrate()
+
+    def _migrate(self) -> None:
+        for table, columns in _NEW_COLUMNS.items():
+            existing = {r["name"] for r in
+                        self.conn.execute(f"PRAGMA table_info({table})").fetchall()}
+            for name, sqltype in columns:
+                if name not in existing:
+                    self.conn.execute(
+                        f"ALTER TABLE {table} ADD COLUMN {name} {sqltype}")
+        self.conn.commit()
 
     def save_scan(self, result: ScanResult, creator: str | None,
                   funder: str | None, top_holders: list[str]) -> None:
@@ -225,25 +253,41 @@ class Store:
             (price, session_id))
         self.conn.commit()
 
+    def end_watch_session(self, session_id: int, ended_ts: int) -> None:
+        # NOT resolved_ts: that column is reserved for a later replay phase
+        # that scores a session's price outcome. Writing it here would make
+        # sessions look already-resolved and a future replay pass would
+        # skip them.
+        self.conn.execute(
+            "UPDATE watch_sessions SET ended_ts = ? WHERE id = ?",
+            (ended_ts, session_id))
+        self.conn.commit()
+
     def record_watch_signal(self, session_id: int, ts: int, state: str,
                             reason: str, eta: float | None, lam: float | None,
-                            hold_drift: float | None) -> None:
+                            hold_drift: float | None,
+                            hazard_per_s: float | None = None,
+                            eta_peak: float | None = None,
+                            lam_peak: float | None = None) -> None:
         self.conn.execute(
             "INSERT INTO watch_signals (session_id, ts, state, reason, eta, "
-            "lam, hold_drift) VALUES (?, ?, ?, ?, ?, ?, ?)",
-            (session_id, ts, state, reason, eta, lam, hold_drift))
+            "lam, hold_drift, hazard_per_s, eta_peak, lam_peak) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (session_id, ts, state, reason, eta, lam, hold_drift,
+             hazard_per_s, eta_peak, lam_peak))
         self.conn.commit()
 
     def watch_session_signals(self, session_id: int) -> list[dict]:
         rows = self.conn.execute(
-            "SELECT ts, state, reason, eta, lam, hold_drift FROM watch_signals "
+            "SELECT ts, state, reason, eta, lam, hold_drift, hazard_per_s, "
+            "eta_peak, lam_peak FROM watch_signals "
             "WHERE session_id = ? ORDER BY ts, id", (session_id,)).fetchall()
         return [dict(r) for r in rows]
 
     def recent_watch_sessions(self, limit: int = 50) -> list[dict]:
         rows = self.conn.execute(
             "SELECT id, mint, started_ts, entry_price, sensitivity, hazard_pct,"
-            " toggles, resolved_ts FROM watch_sessions "
+            " toggles, resolved_ts, ended_ts FROM watch_sessions "
             "ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
         return [dict(r) for r in rows]
 

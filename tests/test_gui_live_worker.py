@@ -1,20 +1,11 @@
-import pytest
-
 from arena.flow.signal import DISCONNECTED, EXIT, WARMUP
 from arena.gui.live_worker import WatchHandle, start_watch
 from arena.stream.tape import TapeEvent
 from arena.thresholds import QME_HAZARD_MULT_MINT_LIVE
 
-
-@pytest.fixture(autouse=True)
-def _isolated_data_dir(tmp_path, monkeypatch):
-    # start_watch's default recorder_factory builds a real Store(), which
-    # resolves to the app's real database unless redirected. Without this,
-    # every test below that omits recorder_factory would write watch-session
-    # rows into the user's actual ~/Library/Application Support/CoinArena
-    # database on every test run.
-    monkeypatch.setenv("ARENA_DATA_DIR", str(tmp_path))
-
+# ARENA_DATA_DIR isolation (so start_watch's default recorder_factory never
+# touches the user's real database) is provided repo-wide by the autouse
+# fixture in tests/conftest.py.
 
 def test_handle_stop_sets_the_flag():
     handle = WatchHandle()
@@ -144,6 +135,8 @@ class FakeRecorder:
         self.started = False
         self.prices = []
         self.states = []
+        self.hazards = []
+        self.finished = False
 
     def start(self):
         self.started = True
@@ -151,8 +144,12 @@ class FakeRecorder:
     def note_price(self, price):
         self.prices.append(price)
 
-    def note_state(self, state):
+    def note_state(self, state, hazard_ps=None):
         self.states.append(state.state)
+        self.hazards.append(hazard_ps)
+
+    def finish(self):
+        self.finished = True
 
 
 def test_recorder_is_started_on_the_worker_thread():
@@ -212,7 +209,10 @@ def test_a_raising_recorder_does_not_break_the_watch():
         def note_price(self, price):
             raise RuntimeError("boom")
 
-        def note_state(self, state):
+        def note_state(self, state, hazard_ps=None):
+            raise RuntimeError("boom")
+
+        def finish(self):
             raise RuntimeError("boom")
 
     states = []
@@ -225,3 +225,52 @@ def test_a_raising_recorder_does_not_break_the_watch():
         clock=lambda: next(ticks), recorder_factory=ExplodingRecorder)
     handle.join(timeout=5)
     assert states, "the watch must keep emitting states despite recorder failure"
+
+
+def test_finish_is_called_when_the_watch_completes_normally():
+    """Finding 1: ended_ts must be written whether the watch ends normally
+    or by exception, so worker() calls recorder.finish() in a finally
+    around asyncio.run(run())."""
+    rec = FakeRecorder()
+    ticks = iter([float(i) for i in range(200)])
+    handle = start_watch(
+        mint="M" * 44, key="K", sensitivity="balanced", base_hazard_pct=20.0,
+        on_state=lambda s: None, watch_fn=_fake_watch([]),
+        clock=lambda: next(ticks), recorder_factory=lambda: rec)
+    handle.join(timeout=5)
+    assert rec.finished is True
+
+
+def test_finish_is_called_even_when_the_watch_raises():
+    rec = FakeRecorder()
+
+    async def _raising_watch_fn(key, mint, on_event, on_disconnect,
+                                on_reconnect, stop, **kw):
+        raise RuntimeError("socket blew up")
+
+    handle = start_watch(
+        mint="M" * 44, key="K", sensitivity="balanced", base_hazard_pct=20.0,
+        on_state=lambda s: None, watch_fn=_raising_watch_fn,
+        clock=lambda: 0.0, recorder_factory=lambda: rec)
+    handle.join(timeout=5)
+    assert rec.finished is True
+
+
+def test_recorder_receives_the_effective_hazard_per_evaluation():
+    """Finding 2: get_multipliers() is re-read on every evaluation, so the
+    recorded toggles snapshot alone cannot say what hazard produced a given
+    signal row. evaluate() must pass its computed hazard into note_state."""
+    from arena.flow.hazard import hazard_per_s as real_hazard_per_s
+
+    rec = FakeRecorder()
+    events = [TapeEvent(ts=float(i), is_buy=True, sol=0.1, price=1.0)
+              for i in range(5)]
+    ticks = iter([float(i) for i in range(200)])
+    handle = start_watch(
+        mint="M" * 44, key="K", sensitivity="balanced", base_hazard_pct=20.0,
+        on_state=lambda s: None, watch_fn=_fake_watch(events),
+        clock=lambda: next(ticks), recorder_factory=lambda: rec)
+    handle.join(timeout=5)
+    assert rec.hazards
+    expected = real_hazard_per_s(20.0, [])
+    assert all(h == expected for h in rec.hazards)
