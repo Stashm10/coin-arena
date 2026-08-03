@@ -242,7 +242,14 @@ def test_finish_is_called_when_the_watch_completes_normally():
 
 
 def test_finish_is_called_even_when_the_watch_raises():
+    """If anything escapes the stream loop unhandled, the watch thread must
+    not die silently: the engine's own contract (arena/flow/signal.py) is
+    that an absence of trades IS the signal, so a dead socket must surface
+    as DISCONNECTED (all numerics None) through on_state — never leave the
+    UI readout frozen looking live — and the session must still get its
+    ended_ts."""
     rec = FakeRecorder()
+    states = []
 
     async def _raising_watch_fn(key, mint, on_event, on_disconnect,
                                 on_reconnect, stop, **kw):
@@ -250,10 +257,16 @@ def test_finish_is_called_even_when_the_watch_raises():
 
     handle = start_watch(
         mint="M" * 44, key="K", sensitivity="balanced", base_hazard_pct=20.0,
-        on_state=lambda s: None, watch_fn=_raising_watch_fn,
+        on_state=states.append, watch_fn=_raising_watch_fn,
         clock=lambda: 0.0, recorder_factory=lambda: rec)
     handle.join(timeout=5)
     assert rec.finished is True
+    assert states, "a DISCONNECTED state must reach the UI when the watch crashes"
+    last = states[-1]
+    assert last.state == DISCONNECTED
+    assert last.eta is None and last.eta_peak is None
+    assert last.lam is None and last.lam_peak is None
+    assert last.hold_drift is None
 
 
 def test_recorder_receives_the_effective_hazard_per_evaluation():

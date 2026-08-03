@@ -135,6 +135,17 @@ def start_watch(mint: str, key: str, sensitivity: str, base_hazard_pct: float,
         _safely("start")
         try:
             asyncio.run(run())
+        except Exception as exc:
+            # Nothing may escape this thread unhandled: a dead worker thread
+            # leaves the UI readout frozen looking live, with no
+            # DISCONNECTED and no alert, while nothing is actually being
+            # watched. arena/flow/signal.py's whole premise is that an
+            # absence of trades IS the signal — a crash must surface as
+            # exactly that, not as silence.
+            log.warning("watch worker crashed: %s", exc, exc_info=True)
+            state = engine.mark_disconnected()
+            on_state(state)
+            _safely("note_state", state)
         finally:
             # Runs whether the watch ends normally or by exception, so a
             # session's duration is always knowable.
