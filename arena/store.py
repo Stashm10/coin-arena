@@ -47,6 +47,28 @@ CREATE TABLE IF NOT EXISTS funding_edges (
     is_root INTEGER NOT NULL DEFAULT 0,
     resolved_ts INTEGER NOT NULL
 );
+CREATE TABLE IF NOT EXISTS watch_sessions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    mint TEXT NOT NULL,
+    started_ts INTEGER NOT NULL,
+    entry_price REAL,
+    sensitivity TEXT NOT NULL,
+    hazard_pct REAL NOT NULL,
+    toggles TEXT NOT NULL,
+    resolved_ts INTEGER
+);
+CREATE TABLE IF NOT EXISTS watch_signals (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id INTEGER NOT NULL,
+    ts INTEGER NOT NULL,
+    state TEXT NOT NULL,
+    reason TEXT NOT NULL,
+    eta REAL,
+    lam REAL,
+    hold_drift REAL
+);
+CREATE INDEX IF NOT EXISTS idx_watch_signals_session
+    ON watch_signals(session_id, ts);
 """
 
 
@@ -187,6 +209,43 @@ class Store:
             "resolved_ts = excluded.resolved_ts",
             (child, parent, int(is_root), int(time.time())))
         self.conn.commit()
+
+    def start_watch_session(self, mint: str, started_ts: int, sensitivity: str,
+                           hazard_pct: float, toggles: list[float]) -> int:
+        cur = self.conn.execute(
+            "INSERT INTO watch_sessions (mint, started_ts, sensitivity, "
+            "hazard_pct, toggles) VALUES (?, ?, ?, ?, ?)",
+            (mint, started_ts, sensitivity, hazard_pct, json.dumps(toggles)))
+        self.conn.commit()
+        return cur.lastrowid
+
+    def set_session_entry_price(self, session_id: int, price: float) -> None:
+        self.conn.execute(
+            "UPDATE watch_sessions SET entry_price = ? WHERE id = ?",
+            (price, session_id))
+        self.conn.commit()
+
+    def record_watch_signal(self, session_id: int, ts: int, state: str,
+                            reason: str, eta: float | None, lam: float | None,
+                            hold_drift: float | None) -> None:
+        self.conn.execute(
+            "INSERT INTO watch_signals (session_id, ts, state, reason, eta, "
+            "lam, hold_drift) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (session_id, ts, state, reason, eta, lam, hold_drift))
+        self.conn.commit()
+
+    def watch_session_signals(self, session_id: int) -> list[dict]:
+        rows = self.conn.execute(
+            "SELECT ts, state, reason, eta, lam, hold_drift FROM watch_signals "
+            "WHERE session_id = ? ORDER BY ts, id", (session_id,)).fetchall()
+        return [dict(r) for r in rows]
+
+    def recent_watch_sessions(self, limit: int = 50) -> list[dict]:
+        rows = self.conn.execute(
+            "SELECT id, mint, started_ts, entry_price, sensitivity, hazard_pct,"
+            " toggles, resolved_ts FROM watch_sessions "
+            "ORDER BY id DESC LIMIT ?", (limit,)).fetchall()
+        return [dict(r) for r in rows]
 
     def close(self) -> None:
         self.conn.close()
