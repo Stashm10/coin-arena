@@ -1,4 +1,4 @@
-# Coin Arena 🐴
+# Coin Arena 
 
 **Two tools for Solana meme coins.** On launch, pick one:
 
@@ -36,9 +36,9 @@ Your key is stored only on your own machine and is never bundled or shared.
 
 Paste a mint address, click **Check**, get a verdict in a few seconds:
 
-- 🔴 **AVOID** — a mechanical rug setup was found
-- 🟡 **CAUTION** — a couple of warning signs
-- 🟢 **NO RED FLAGS** — nothing obvious found *(not the same as "safe" — read the caveats)*
+-  **AVOID** — a mechanical rug setup was found
+-  **CAUTION** — a couple of warning signs
+-  **NO RED FLAGS** — nothing obvious found *(not the same as "safe" — read the caveats)*
 
 ### The six checks
 
