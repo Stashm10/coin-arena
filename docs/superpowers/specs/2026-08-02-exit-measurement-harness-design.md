@@ -19,6 +19,31 @@ by how much?
 
 A negative result is a real result. The point is to find out, not to confirm.
 
+## 1a. Phasing — only Phase 1 is being built now
+
+The analysis is worthless until there are sessions to analyse, and there are
+none. So the build is split, and **only Phase 1 is in scope for the current
+implementation plan**:
+
+| Phase | Scope | Status |
+|---|---|---|
+| **1 — Capture** | §5 tables (`watch_sessions`, `watch_signals`) and the engine writes that fill them | **Building now** |
+| 2 — Resolution | §6 `replay.py` and the `watch_outcomes` table | Deferred |
+| 3 — Analysis | §7 scoring and §8 report | Deferred |
+
+The reasoning: data is perishable and analysis is not. Every watch that happens
+before capture exists is a watch that can never be measured, whereas the scoring
+code can be written any time the appetite arrives. Phase 1 is roughly a fifth of
+the total work and adds no user-facing surface.
+
+Phases 2 and 3 are specified below in full so the capture schema is designed
+against its real consumer rather than guessed at. `watch_outcomes` is **not**
+created in Phase 1 — `CREATE TABLE IF NOT EXISTS` runs on every `Store()`
+construction, so adding it later costs nothing and creating it now would be an
+unused table.
+
+Revisit Phase 2 once roughly 30–40 sessions have accumulated.
+
 ## 2. Decisions already made
 
 | Question | Decision |
